@@ -12,15 +12,14 @@ public class WebhookTwilioController {
 
 	@PostMapping
     public ResponseEntity<String> recibir(
-
             @RequestParam("From") String from,
             @RequestParam("Body") String body,
             @RequestParam("ProfileName") String profileName) {
 
-        System.out.println("Usuario: " + profileName);
-        System.out.println("Número: " + from);
-        System.out.println("Mensaje: " + body);
-
-        return ResponseEntity.ok("");
+        return ResponseEntity.ok("Usuario: ".concat(profileName + "\n")
+        		.concat("")
+        		.concat("Número: ".concat(from + "\n"))
+        		.concat("")
+        		.concat("Mensaje: ".concat(body)));
     }
 }
