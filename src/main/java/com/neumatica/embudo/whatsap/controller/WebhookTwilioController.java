@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/webhook")
 public class WebhookTwilioController {
 	
+	private static final Logger log = LoggerFactory.getLogger(WebhookTwilioController.class);
+	
 	@PostMapping
 	public ResponseEntity<String> receive(@RequestBody String payload) {
-	    System.out.println(payload);
+	    log.info(payload);
 	    return ResponseEntity.ok("EVENT_RECEIVED");
 	}
 	
@@ -28,7 +30,7 @@ public class WebhookTwilioController {
 
 	    if ("subscribe".equals(mode)
 	            && "andres123".equals(token)) {
-	    	System.out.println(challenge);
+	    	log.info(challenge);
 	    	return ResponseEntity.ok(challenge);
 	        
 	    }
@@ -36,7 +38,7 @@ public class WebhookTwilioController {
 	    return ResponseEntity.status(403).build();
 	}
 	
-	//private static final Logger log = LoggerFactory.getLogger(WebhookTwilioController.class);
+	
 
 	/*@PostMapping
     public ResponseEntity<String> recibir(
