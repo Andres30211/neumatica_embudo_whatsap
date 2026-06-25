@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/webhook")
 public class WebhookTwilioController {
 	
-	@GetMapping("/webhook")
+	@GetMapping
 	public ResponseEntity<String> verify(
 	        @RequestParam("hub.mode") String mode,
 	        @RequestParam("hub.verify_token") String token,
