@@ -21,7 +21,7 @@ public class WebhookTwilioController {
 	@Autowired
 	private WhatsappWebhookService whatsappWebhookService;
 	
-	@GetMapping
+	@GetMapping("/contacts")
 	public ResponseEntity<List<Contact>> contacts(){
 		return ResponseEntity.ok(this.whatsappWebhookService.contacts());
 	}
