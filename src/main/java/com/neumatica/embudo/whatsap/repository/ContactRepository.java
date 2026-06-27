@@ -13,13 +13,13 @@ import com.neumatica.embudo.whatsap.entitys.Contact;
 @Repository
 public interface ContactRepository extends JpaRepository<Contact, UUID>{
 	
-	@Query("""
+	/*@Query("""
 	        SELECT DISTINCT c
 	        FROM Contact c
 	        LEFT JOIN FETCH c.conversations conv
 	        LEFT JOIN FETCH conv.messages
 	    """)
-	    List<Contact> findAllWithConversations();
+	    List<Contact> findAllWithConversations();*/
 
 	Optional<Contact> findByPhone(String phone);
 }
