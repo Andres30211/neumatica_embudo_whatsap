@@ -42,7 +42,7 @@ public class Message {
     @Column(unique = true)
     private String whatsappMessageId;
     
-    @JsonBackReference
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contact_id")
     private Contact contact;
