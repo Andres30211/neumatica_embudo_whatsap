@@ -43,10 +43,10 @@ public class Conversation {
     @JoinColumn(name = "contact_id")
     private Contact contact;
 	
-	/*@OneToMany(mappedBy = "conversation",
+	@OneToMany(mappedBy = "conversation",
 	           cascade = CascadeType.ALL,
 	           fetch = FetchType.LAZY)
-	private List<Message> messages = new ArrayList<>();*/
+	private List<Message> messages = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     private ConversationStatus status;

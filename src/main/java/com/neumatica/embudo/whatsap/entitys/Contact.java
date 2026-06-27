@@ -66,9 +66,9 @@ public class Contact {
      */
     private String country;
     
-    /*@JsonBackReference
+    @JsonBackReference
     @OneToMany(mappedBy = "contact", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Conversation> conversations = new ArrayList<>();*/
+    private List<Conversation> conversations = new ArrayList<>();
 
     /**
      * Primer contacto
