@@ -41,12 +41,12 @@ public class Conversation {
 	/*@JsonBackReference
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contact_id")
-    private Contact contact;*/
+    private Contact contact;
 	
 	@OneToMany(mappedBy = "conversation",
 	           cascade = CascadeType.ALL,
 	           fetch = FetchType.LAZY)
-	private List<Message> messages = new ArrayList<>();
+	private List<Message> messages = new ArrayList<>();*/
 
     @Enumerated(EnumType.STRING)
     private ConversationStatus status;
