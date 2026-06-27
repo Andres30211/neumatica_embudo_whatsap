@@ -1,6 +1,7 @@
 package com.neumatica.embudo.whatsap.services;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,11 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	@Autowired
 	private MessageMapper messageMapper;
+	
+	@Override
+	public List<Contact> contacts() {
+		return this.contactRepository.findAll();
+	}
 
 	@Override
 	public void processWebhook(WhatsappWebHookDto webhook) {
