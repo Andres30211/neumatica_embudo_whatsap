@@ -41,7 +41,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	@Override
 	public List<Contact> contacts() {
-		return this.contactRepository.findAllWithConversations();
+		return this.contactRepository.findAll();
 	}
 
 	@Override
