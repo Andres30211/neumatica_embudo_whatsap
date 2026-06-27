@@ -19,4 +19,18 @@ public class MessageDto {
     private String type;
 
     private TextDto text;
+    
+    private ImageDto image;
+
+    private VideoDto video;
+
+    private AudioDto audio;
+
+    private DocumentDto document;
+
+    private StickerDto sticker;
+
+    private LocationDto location;
+
+    private ContextDto context;
 }
