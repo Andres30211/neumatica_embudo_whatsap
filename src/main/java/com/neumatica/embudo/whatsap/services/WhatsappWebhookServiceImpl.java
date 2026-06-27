@@ -41,8 +41,28 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	@Override
 	public List<Contact> contacts() {
-		return this.contactRepository.findAllWithConversations();
-	}
+		
+		List<Contact> contacts = this.contactRepository.findAll();
+
+        for (Contact contact : contacts) {
+
+            List<Conversation> conversations =
+                    this.conversationRepository.findByContact(contact);
+
+            for (Conversation conversation : conversations) {
+
+                List<Message> messages =
+                        this.messageRepository.findByConversation(conversation);
+
+                conversation.setMessages(messages);
+            }
+
+            contact.setConversations(conversations);
+        }
+
+        return contacts;
+    }
+	
 
 	@Override
 	public void processWebhook(WhatsappWebHookDto webhook) {
@@ -97,7 +117,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
                     Conversation conversation =
                             Conversation.builder()
-                                    /*.contact(contact)*/
+                                    .contact(contact)
                                     .status(ConversationStatus.BOT)
                                     .startedAt(LocalDateTime.now())
                                     .lastMessageAt(LocalDateTime.now())
