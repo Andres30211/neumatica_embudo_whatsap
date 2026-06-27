@@ -3,6 +3,7 @@ package com.neumatica.embudo.whatsap.entitys;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.neumatica.embudo.whatsap.enums.Direction;
 import com.neumatica.embudo.whatsap.enums.MessageType;
 
@@ -41,6 +42,7 @@ public class Message {
     @Column(unique = true)
     private String whatsappMessageId;
 
+    @JsonBackReference
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id")
     private Conversation conversation;

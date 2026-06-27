@@ -3,6 +3,7 @@ package com.neumatica.embudo.whatsap.entitys;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.neumatica.embudo.whatsap.enums.ConversationStatus;
 
 import jakarta.persistence.Entity;
@@ -33,6 +34,7 @@ public class Conversation {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+	@JsonBackReference
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contact_id")
     private Contact contact;
