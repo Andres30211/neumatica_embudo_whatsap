@@ -1,61 +1,27 @@
 package com.neumatica.embudo.whatsap.controller;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.neumatica.embudo.whatsap.dto.webhook.WhatsappWebHookDto;
 
 @RestController
 @RequestMapping("/webhook")
 public class WebhookTwilioController {
 	
-	private static final Logger log = LoggerFactory.getLogger(WebhookTwilioController.class);
-	
 	@PostMapping
-	public ResponseEntity<String> receive(@RequestBody String payload) {
-	    log.info(payload);
-	    return ResponseEntity.ok("EVENT_RECEIVED");
-	}
-	
-	@GetMapping
-	public ResponseEntity<String> verify(
-	        @RequestParam("hub.mode") String mode,
-	        @RequestParam("hub.verify_token") String token,
-	        @RequestParam("hub.challenge") String challenge) {
+    public ResponseEntity<Void> webhook(
+            @RequestBody WhatsappWebHookDto webhook) {
 
-	    if ("subscribe".equals(mode)
-	            && "andres123".equals(token)) {
-	    	log.info(challenge);
-	    	return ResponseEntity.ok(challenge);
-	        
-	    }
+        System.out.println(webhook.getEntry().getFirst().getChanges().getFirst().getValue().getMessagingProduct());
+        System.out.println(webhook.getEntry().getFirst().getChanges().getFirst().getValue().getMetadata().getDisplayPhoneNumber());
+        System.out.println(webhook.getEntry().getFirst().getChanges().getFirst().getValue().getContacts().getFirst().getProfile().getName());
+        System.out.println(webhook.getEntry().getFirst().getChanges().getFirst().getValue().getContacts().getFirst().getWaId());
+        System.out.println(webhook.getEntry().getFirst().getChanges().getFirst().getValue().getMessages().getFirst().getText().getBody());
 
-	    return ResponseEntity.status(403).build();
-	}
-	
-	
-
-	/*@PostMapping
-    public ResponseEntity<String> recibir(
-            @RequestParam("From") String from,
-            @RequestParam("Body") String body,
-            @RequestParam("ProfileName") String profileName) {
-
-		log.info("\nUsuario: ".concat(profileName + "\n")
-        		.concat("")
-        		.concat("Número: ".concat(from + "\n"))
-        		.concat("")
-        		.concat("Mensaje: ".concat(body)));
-		
-        return ResponseEntity.ok("Usuario: ".concat(profileName + "\n")
-        		.concat("")
-        		.concat("Número: ".concat(from + "\n"))
-        		.concat("")
-        		.concat("Mensaje: ".concat(body)));
-    }*/
+        return ResponseEntity.ok().build();
+    }
 }
