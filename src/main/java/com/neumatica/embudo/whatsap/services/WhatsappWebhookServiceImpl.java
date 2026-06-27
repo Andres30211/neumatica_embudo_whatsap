@@ -60,7 +60,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     private Contact getOrCreateContact(ContactDto dto) {
 
-        return contactRepository.findByWaId(dto.getWaId())
+        return contactRepository.findByPhone(dto.getWaId())
                 .map(contact -> {
 
                     contact.setName(dto.getProfile().getName());

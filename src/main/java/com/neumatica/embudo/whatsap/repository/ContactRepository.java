@@ -11,5 +11,5 @@ import com.neumatica.embudo.whatsap.entitys.Contact;
 @Repository
 public interface ContactRepository extends JpaRepository<Contact, UUID>{
 
-	Optional<Contact> findByWaId(String waId);
+	Optional<Contact> findByPhone(String phone);
 }
