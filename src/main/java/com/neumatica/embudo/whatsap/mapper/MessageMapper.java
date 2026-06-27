@@ -17,7 +17,7 @@ public class MessageMapper {
             Conversation conversation){
 
 		Message message = Message.builder()
-		.conversation(conversation)
+		/*.conversation(conversation)*/
 		.whatsappMessageId(dto.getId())
 		.direction(Direction.INCOMING)
 		.type(MessageType.valueOf(dto.getType().toUpperCase()))

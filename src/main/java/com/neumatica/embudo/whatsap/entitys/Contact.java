@@ -68,7 +68,11 @@ public class Contact {
     
     @JsonBackReference
     @OneToMany(mappedBy = "contact", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Conversation> conversations = new ArrayList<>();
+    private List<Message> messages = new ArrayList<>();
+    
+    /*@JsonBackReference
+    @OneToMany(mappedBy = "contact", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Conversation> conversations = new ArrayList<>();*/
 
     /**
      * Primer contacto

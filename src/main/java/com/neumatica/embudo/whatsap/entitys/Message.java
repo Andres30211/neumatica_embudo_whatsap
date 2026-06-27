@@ -41,11 +41,16 @@ public class Message {
      */
     @Column(unique = true)
     private String whatsappMessageId;
-
+    
     @JsonBackReference
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contact_id")
+    private Contact contact;
+
+    /*@JsonBackReference
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id")
-    private Conversation conversation;
+    private Conversation conversation;*/
 
     @Enumerated(EnumType.STRING)
     private Direction direction;

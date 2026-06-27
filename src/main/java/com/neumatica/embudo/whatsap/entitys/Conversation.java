@@ -38,10 +38,10 @@ public class Conversation {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-	@JsonBackReference
+	/*@JsonBackReference
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "contact_id")
-    private Contact contact;
+    private Contact contact;*/
 	
 	@OneToMany(mappedBy = "conversation",
 	           cascade = CascadeType.ALL,

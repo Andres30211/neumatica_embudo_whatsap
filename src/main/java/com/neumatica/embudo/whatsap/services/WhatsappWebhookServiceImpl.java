@@ -56,7 +56,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
         MessageDto messageDTO = value.getMessages().getFirst();
 
-        Contact contact =this.getOrCreateContact(contactDTO);
+        Contact contact = this.getOrCreateContact(contactDTO);
 
         Conversation conversation = getOrCreateConversation(contact);
 
@@ -66,21 +66,21 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     private Contact getOrCreateContact(ContactDto dto) {
 
-        return contactRepository.findByPhone(dto.getWaId())
+        return this.contactRepository.findByPhone(dto.getWaId())
                 .map(contact -> {
 
                     contact.setName(dto.getProfile().getName());
 
                     contact.setLastInteraction(LocalDateTime.now());
 
-                    return contactRepository.save(contact);
+                    return this.contactRepository.save(contact);
 
                 })
                 .orElseGet(() -> {
 
                     Contact contact = contactMapper.toEntity(dto);
 
-                    return contactRepository.save(contact);
+                    return this.contactRepository.save(contact);
 
                 });
 
@@ -88,7 +88,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     private Conversation getOrCreateConversation(Contact contact) {
 
-        return conversationRepository
+        return this.conversationRepository
                 .findFirstByContactAndStatus(
                         contact,
                         ConversationStatus.BOT
@@ -97,13 +97,13 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
                     Conversation conversation =
                             Conversation.builder()
-                                    .contact(contact)
+                                    /*.contact(contact)*/
                                     .status(ConversationStatus.BOT)
                                     .startedAt(LocalDateTime.now())
                                     .lastMessageAt(LocalDateTime.now())
                                     .build();
 
-                    return conversationRepository.save(conversation);
+                    return this.conversationRepository.save(conversation);
 
                 });
 
@@ -112,18 +112,17 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     private void saveMessage(Conversation conversation,
                              MessageDto dto) {
 
-        if (messageRepository.existsByWhatsappMessageId(dto.getId())) {
+        if (this.messageRepository.existsByWhatsappMessageId(dto.getId())) {
             return;
         }
 
-        Message message =
-                messageMapper.toEntity(dto, conversation);
+        Message message = this.messageMapper.toEntity(dto, conversation);
 
-        messageRepository.save(message);
+        this.messageRepository.save(message);
 
         conversation.setLastMessageAt(LocalDateTime.now());
 
-        conversationRepository.save(conversation);
+        this.conversationRepository.save(conversation);
 
     }
 
