@@ -15,7 +15,7 @@ public interface ContactRepository extends JpaRepository<Contact, UUID>{
 	
 	@Query("""
 	        SELECT DISTINCT c
-	        FROM Contact c
+	        FROM Contact c 
 	        LEFT JOIN FETCH c.messages
 	    """)
 	    List<Contact> findAllWithConversations();
