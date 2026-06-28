@@ -67,4 +67,8 @@ public class Conversation {
 
     private LocalDateTime closedAt;
 
+    public void addMessage(Message message){
+        messages.add(message);
+        message.setConversation(this);
+    }
 }

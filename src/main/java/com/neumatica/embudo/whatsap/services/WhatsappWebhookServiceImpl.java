@@ -86,9 +86,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         System.out.println(conversation.getLastMessageAt());
         System.out.println(conversation.getMessages().getFirst().getBody());
         
-        /*for (MessageDto dto : value.getMessages()) {
+        for (MessageDto dto : value.getMessages()) {
             saveMessage(conversation, dto);
-        }*/
+        }
 
     }
 
@@ -146,7 +146,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
         Message message = this.messageMapper.toEntity(dto, conversation);
 
-        this.messageRepository.save(message);
+        conversation.addMessage(message);
+        //this.messageRepository.save(message);
 
         conversation.setLastMessageAt(
         	    Instant.ofEpochSecond(Long.parseLong(dto.getTimestamp()))
