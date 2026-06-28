@@ -80,13 +80,14 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         MessageDto messageDTO = value.getMessages().getFirst();
 
         Contact contact = this.getOrCreateContact(contactDTO);
+        System.out.println(contact);
 
-        Conversation conversation = getOrCreateConversation(contact);
+        //Conversation conversation = getOrCreateConversation(contact);
 
-        System.out.println(conversation);
-        for (MessageDto dto : value.getMessages()) {
+        //System.out.println(conversation);
+        /*for (MessageDto dto : value.getMessages()) {
             saveMessage(conversation, dto);
-        }
+        }*/
 
     }
 
