@@ -1,6 +1,8 @@
 package com.neumatica.embudo.whatsap.services;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,7 +85,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
         Conversation conversation = getOrCreateConversation(contact);
 
-        saveMessage(conversation, messageDTO);
+        for (MessageDto dto : value.getMessages()) {
+            saveMessage(conversation, dto);
+        }
 
     }
 
@@ -143,7 +147,11 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
         this.messageRepository.save(message);
 
-        conversation.setLastMessageAt(LocalDateTime.now());
+        conversation.setLastMessageAt(
+        	    Instant.ofEpochSecond(Long.parseLong(dto.getTimestamp()))
+        	           .atZone(ZoneId.systemDefault())
+        	           .toLocalDateTime()
+        	);
 
         this.conversationRepository.save(conversation);
 
