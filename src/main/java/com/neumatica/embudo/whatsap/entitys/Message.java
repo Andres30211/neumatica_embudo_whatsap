@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.neumatica.embudo.whatsap.enums.Direction;
 import com.neumatica.embudo.whatsap.enums.MessageType;
 
@@ -42,6 +43,7 @@ public class Message {
     @Column(unique = true)
     private String whatsappMessageId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id")
     private Conversation conversation;
