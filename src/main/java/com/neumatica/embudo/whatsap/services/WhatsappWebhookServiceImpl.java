@@ -73,7 +73,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
                 .getFirst()
                 .getValue();
 
-		System.out.println(value.getMessages().getFirst().getText().getBody());
+		System.out.println(value);
         /*ContactDto contactDTO = value.getContacts().getFirst();
 
         MessageDto messageDTO = value.getMessages().getFirst();
