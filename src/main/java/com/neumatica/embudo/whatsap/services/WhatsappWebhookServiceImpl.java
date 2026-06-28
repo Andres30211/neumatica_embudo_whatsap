@@ -66,7 +66,38 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
 	@Override
 	public void processWebhook(WhatsappWebHookDto webhook) {
-		ValueDto value = webhook.getEntry()
+		
+		if (webhook.getEntry() == null || webhook.getEntry().isEmpty()) {
+	        return;
+	    }
+
+	    ValueDto value = webhook.getEntry()
+	            .getFirst()
+	            .getChanges()
+	            .getFirst()
+	            .getValue();
+
+	    // Ignorar eventos que no contienen mensajes
+	    if (value.getMessages() == null || value.getMessages().isEmpty()) {
+	        System.out.println("Evento sin mensajes recibido.");
+	        return;
+	    }
+
+	    if (value.getContacts() == null || value.getContacts().isEmpty()) {
+	        System.out.println("Evento sin contactos recibido.");
+	        return;
+	    }
+
+	    ContactDto contactDTO = value.getContacts().getFirst();
+	    MessageDto messageDTO = value.getMessages().getFirst();
+
+	    Contact contact = getOrCreateContact(contactDTO);
+
+	    Conversation conversation = getOrCreateConversation(contact);
+
+	    saveMessage(conversation, messageDTO);
+		
+		/*ValueDto value = webhook.getEntry()
                 .getFirst()
                 .getChanges()
                 .getFirst()
@@ -80,7 +111,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
         Conversation conversation = getOrCreateConversation(contact);
 
-        saveMessage(conversation, messageDTO);
+        saveMessage(conversation, messageDTO);*/
 
     }
 
