@@ -26,6 +26,8 @@ import com.neumatica.embudo.whatsap.repository.MessageRepository;
 import com.neumatica.embudo.whatsap.repository.WhatsappResponseAutimatics;
 import com.neumatica.embudo.whatsap.repository.WhatsappWebhookService;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
@@ -71,7 +73,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         return contacts;
     }
 	
-
+	@Transactional
 	@Override
 	public void processWebhook(WhatsappWebHookDto webhook) {
 		
@@ -96,7 +98,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
             saveMessage(conversation, dto);
         }
         
-        switch (contact.getRegistrationStep()) {
+        /*switch (contact.getRegistrationStep()) {
 
 	        case EMAIL -> processEmail(contact, messageDTO);
 	
@@ -113,7 +115,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	        }
 
-        }
+        }*/
     }
 
     private Contact getOrCreateContact(ContactDto dto) {
