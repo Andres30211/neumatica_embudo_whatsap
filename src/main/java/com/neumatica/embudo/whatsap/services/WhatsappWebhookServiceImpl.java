@@ -93,8 +93,12 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         for (MessageDto dto : value.getMessages()) {
             saveMessage(conversation, dto);
         }
+        
+        if(contact.getEmail() == null) {
+        	
+        }
 
-        this.whatsappResponseAutimatics.sendText(contact.getPhone(), "Hola ".concat(contact.getName()).concat("recivimos tu mensaje..."));
+        this.whatsappResponseAutimatics.sendText(contact.getPhone(), contact);
     }
 
     private Contact getOrCreateContact(ContactDto dto) {
