@@ -92,11 +92,11 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
         Conversation conversation = getOrCreateConversation(contact);
         System.out.println(conversation.getLastMessageAt());
-        System.out.println(conversation.getMessages().getFirst().getBody());
         
         for (MessageDto dto : value.getMessages()) {
             saveMessage(conversation, dto);
         }
+        System.out.println(conversation.getMessages().getFirst().getBody());
         
         /*switch (contact.getRegistrationStep()) {
 
