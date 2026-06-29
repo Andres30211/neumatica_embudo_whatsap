@@ -16,7 +16,7 @@ import com.neumatica.embudo.whatsap.repository.WhatsappWebhookService;
 
 @RestController
 @RequestMapping("/webhook")
-public class WebhookTwilioController {
+public class WebhookMetaController {
 	
 	@Autowired
 	private WhatsappWebhookService whatsappWebhookService;

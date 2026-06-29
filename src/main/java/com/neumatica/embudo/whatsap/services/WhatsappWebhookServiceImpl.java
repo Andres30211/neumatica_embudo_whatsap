@@ -21,6 +21,7 @@ import com.neumatica.embudo.whatsap.mapper.MessageMapper;
 import com.neumatica.embudo.whatsap.repository.ContactRepository;
 import com.neumatica.embudo.whatsap.repository.ConversationRepository;
 import com.neumatica.embudo.whatsap.repository.MessageRepository;
+import com.neumatica.embudo.whatsap.repository.WhatsappResponseAutimatics;
 import com.neumatica.embudo.whatsap.repository.WhatsappWebhookService;
 
 @Service
@@ -34,6 +35,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	@Autowired
 	private MessageRepository messageRepository;
+	
+	@Autowired
+	private WhatsappResponseAutimatics whatsappResponseAutimatics;
 	
 	@Autowired
 	private ContactMapper contactMapper;
@@ -90,6 +94,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
             saveMessage(conversation, dto);
         }
 
+        this.whatsappResponseAutimatics.sendText(contact.getPhone(), "Hola ".concat(contact.getName()).concat("recivimos tu mensaje..."));
     }
 
     private Contact getOrCreateContact(ContactDto dto) {
