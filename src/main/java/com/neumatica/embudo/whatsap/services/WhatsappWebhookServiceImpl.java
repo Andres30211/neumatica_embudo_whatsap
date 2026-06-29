@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -240,6 +241,12 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		contact.getPhone(),
 		"✅ Registro completado.\\nEn unos minutos un asesor te atenderá."
 		);
+		
+	}
+
+	@Override
+	public void delete(UUID id) {
+		this.contactRepository.deleteById(id);
 		
 	}
 }
