@@ -122,8 +122,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
                 .map(contact -> {
 
                     contact.setName(dto.getProfile().getName());
-                    
-                    contact.setRegistrationStep(RegistrationStep.EMAIL);
 
                     contact.setLastInteraction(LocalDateTime.now());
 
