@@ -24,7 +24,7 @@ public class WebhookMetaController {
 	@Autowired
 	private WhatsappWebhookService whatsappWebhookService;
 	
-	@DeleteMapping("/{id}")
+	@DeleteMapping("/delete/{id}")
 	public void delete(@PathVariable("id") UUID id){
 		this.whatsappWebhookService.delete(id);
 	}
