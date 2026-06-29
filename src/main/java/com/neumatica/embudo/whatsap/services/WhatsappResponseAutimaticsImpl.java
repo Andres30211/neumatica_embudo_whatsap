@@ -5,7 +5,6 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import com.neumatica.embudo.whatsap.entitys.Contact;
 import com.neumatica.embudo.whatsap.repository.WhatsappResponseAutimatics;
 
 @Service
@@ -14,17 +13,7 @@ public class WhatsappResponseAutimaticsImpl implements WhatsappResponseAutimatic
 	private final RestClient restClient = RestClient.create();
 
 	@Override
-	public void sendText(String to, Contact contact) {
-		
-		String message = "";
-		
-		if(contact.getEmail() == null) {
-			message = "Hola ".concat(contact.getName()).concat(" gracias por comunicarte con nosotros, para una mejor experiencia"
-					+ "proporciona la siguiente información: "
-					+ "\n1. Escribe tu email.");
-		}else {
-			message = "Por favor espera, en un momento seras atendido por un asesor... ⏳";
-		}
+	public void sendText(String to, String message) {
 		
 		 String url = "https://graph.facebook.com/v25.0/"
 	                + "1228471667014746"

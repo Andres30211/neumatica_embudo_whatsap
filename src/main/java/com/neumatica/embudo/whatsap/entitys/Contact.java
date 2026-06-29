@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.neumatica.embudo.whatsap.enums.RegistrationStep;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -66,6 +68,8 @@ public class Contact {
      * País
      */
     private String country;
+    
+    private RegistrationStep registrationStep;
     
     @OneToMany(mappedBy = "contact", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Conversation> conversations = new ArrayList<>();
