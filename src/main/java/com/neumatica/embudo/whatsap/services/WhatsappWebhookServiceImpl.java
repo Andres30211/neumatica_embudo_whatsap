@@ -96,7 +96,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         for (MessageDto dto : value.getMessages()) {
             saveMessage(conversation, dto);
         }
-        System.out.println(conversation.getMessages().getFirst().getBody());
         
         /*switch (contact.getRegistrationStep()) {
 
