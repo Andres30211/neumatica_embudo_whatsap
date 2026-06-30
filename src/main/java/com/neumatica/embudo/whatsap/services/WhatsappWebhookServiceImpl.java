@@ -173,9 +173,12 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
         Message message = this.messageMapper.toEntity(dto, conversation);
 
-        conversation.addMessage(message);
+        //conversation.addMessage(message);
         //this.messageRepository.save(message);
 
+        conversation.getMessages().add(message);
+        message.setConversation(conversation);
+        
         conversation.setLastMessageAt(
         	    Instant.ofEpochSecond(Long.parseLong(dto.getTimestamp()))
         	           .atZone(ZoneId.systemDefault())
