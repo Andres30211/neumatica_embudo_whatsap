@@ -89,10 +89,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         MessageDto messageDTO = value.getMessages().getFirst();
 
         Contact contact = this.getOrCreateContact(contactDTO);
-        System.out.println(contact.getName());
 
         Conversation conversation = getOrCreateConversation(contact);
-        System.out.println(conversation.getLastMessageAt());
         
         saveMessage(conversation, messageDTO);
         
@@ -237,6 +235,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     private void processCountry(Contact contact,
             MessageDto messageDTO){
 
+    	System.out.println(contact.getRegistrationStep());
+    	
 		contact.setCountry(
 		messageDTO.getText().getBody()
 		);
@@ -246,6 +246,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		);
 		
 		contactRepository.save(contact);
+		
+		System.out.println(contact.getRegistrationStep());
 		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
