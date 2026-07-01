@@ -182,7 +182,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     					m.getCreatedAt())
 					).collect(Collectors.toList());
     	
-    	conversation.setMessages(messages);
+    	conversation.getMessages().clear();
+    	conversation.getMessages().addAll(messages);
+    	//conversation.setMessages(messages);
 
     	this.conversationRepository.save(conversation);
     	
