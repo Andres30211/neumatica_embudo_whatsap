@@ -97,7 +97,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         saveMessage(conversation, messageDTO);
         
         
-        /*switch (contact.getRegistrationStep()) {
+        switch (contact.getRegistrationStep()) {
 
 	        case EMAIL -> processEmail(contact, messageDTO);
 	
@@ -114,7 +114,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	        }
 
-        }*/
+        }
     }
 
     private Contact getOrCreateContact(ContactDto dto) {
@@ -167,28 +167,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     private void saveMessage(Conversation conversation,
                              MessageDto dto) {
     	
-    	/*List<Message> messages = conversation.getMessages()
-    			.stream()
-    			.map(m -> new Message(m.getWhatsappMessageId(),
-    					conversation,
-    					m.getDirection(),
-    					m.getType(),
-    					m.getBody(),
-    					m.getMediaId(),
-    					m.getMimeType(),
-    					m.getSha256(),
-    					m.getCaption(),
-    					m.getWhatsappTimestamp(),
-    					m.getCreatedAt())
-					).collect(Collectors.toList());
-    	
-    	conversation.getMessages().clear();
-    	conversation.getMessages().addAll(messages);
-    	conversation.setMessages(messages);
-    	
-
-    	this.conversationRepository.save(conversation);*/
-    	
         if (this.messageRepository.existsByWhatsappMessageId(dto.getId())) {
             return;
         }
@@ -219,7 +197,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
-		"Perfecto 😊\nAhora escribe tu país."
+		"Perfecto 😊\nAhora escribe tu ciudad."
 		);
 
     }
@@ -239,7 +217,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
-		"Gracias. \nAhora escribe tu ciudad"
+		"Gracias. \nAhora escribe tu pais"
 		);
 		
     }
