@@ -99,22 +99,34 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         
         switch (contact.getRegistrationStep()) {
 
+	        case GREETING -> {
+	
+	            contact.setRegistrationStep(
+	                    RegistrationStep.EMAIL
+	            );
+	
+	            contactRepository.save(contact);
+	
+	            whatsappResponseAutimatics.sendText(
+	                    contact.getPhone(),
+	                    "Hola " + contact.getName()
+	                    + " 👋\n\n"
+	                    + "Bienvenido a Léxico Digital.\n\n"
+	                    + "Para comenzar necesito tu correo electrónico."
+	            );
+	        }
+	
 	        case EMAIL -> processEmail(contact, messageDTO);
 	
 	        case COUNTRY -> processCountry(contact, messageDTO);
 	
 	        case CITY -> processCity(contact, messageDTO);
 	
-	        case COMPLETED -> {
-	
-	            this.whatsappResponseAutimatics.sendText(
-	                    contact.getPhone(),
-	                    "En un momento te atenderá un asesor."
-	            );
-	
-	        }
-
-        }
+	        case COMPLETED -> whatsappResponseAutimatics.sendText(
+	                contact.getPhone(),
+	                "En unos minutos un asesor continuará con tu atención."
+	        );
+	    }
     }
 
     private Contact getOrCreateContact(ContactDto dto) {
@@ -133,7 +145,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
                     Contact contact = contactMapper.toEntity(dto);
                     
-                    contact.setRegistrationStep(RegistrationStep.EMAIL);
+                    contact.setRegistrationStep(RegistrationStep.GREETING);
 
                     return this.contactRepository.save(contact);
 
@@ -237,7 +249,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
-		"✅ Registro completado.\\nEn unos minutos un asesor te atenderá."
+		"✅ Registro completado.\nEn unos minutos un asesor te atenderá."
 		);
 		
 	}

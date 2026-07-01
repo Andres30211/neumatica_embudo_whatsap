@@ -1,5 +1,6 @@
 package com.neumatica.embudo.whatsap.dto.webhook;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -16,6 +17,6 @@ public class ValueDto {
 
     private List<ContactDto> contacts;
 
-    private List<MessageDto> messages;
+    private List<MessageDto> messages = new ArrayList<>();
 	
 }
