@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -165,14 +166,32 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     private void saveMessage(Conversation conversation,
                              MessageDto dto) {
+    	
+    	List<Message> messages = conversation.getMessages()
+    			.stream()
+    			.map(m -> new Message(m.getWhatsappMessageId(),
+    					conversation,
+    					m.getDirection(),
+    					m.getType(),
+    					m.getBody(),
+    					m.getMediaId(),
+    					m.getMimeType(),
+    					m.getSha256(),
+    					m.getCaption(),
+    					m.getWhatsappTimestamp(),
+    					m.getCreatedAt())
+					).collect(Collectors.toList());
+    	
+    	conversation.setMessages(messages);
 
-        if (this.messageRepository.existsByWhatsappMessageId(dto.getId())) {
+    	this.conversationRepository.save(conversation);
+    	
+        /*if (this.messageRepository.existsByWhatsappMessageId(dto.getId())) {
             return;
         }
 
         Message message = this.messageMapper.toEntity(dto, conversation);
 
-        //conversation.addMessage(message);
         this.messageRepository.save(message);
         
         conversation.setLastMessageAt(
@@ -181,7 +200,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         	           .toLocalDateTime()
         	);
 
-        this.conversationRepository.save(conversation);
+        this.conversationRepository.save(conversation);*/
 
     }
 
