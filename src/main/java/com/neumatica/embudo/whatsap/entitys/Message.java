@@ -91,21 +91,4 @@ public class Message {
 
     private LocalDateTime createdAt;
 
-	public Message(String whatsappMessageId, Conversation conversation, Direction direction, MessageType type,
-			String body, String mediaId, String mimeType, String sha256, String caption, Long whatsappTimestamp,
-			LocalDateTime createdAt) {
-		this.whatsappMessageId = whatsappMessageId;
-		this.conversation = conversation;
-		this.direction = direction;
-		this.type = type;
-		this.body = body;
-		this.mediaId = mediaId;
-		this.mimeType = mimeType;
-		this.sha256 = sha256;
-		this.caption = caption;
-		this.whatsappTimestamp = whatsappTimestamp;
-		this.createdAt = createdAt;
-	}
-    
-    
 }

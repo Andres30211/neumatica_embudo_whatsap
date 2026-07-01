@@ -69,6 +69,10 @@ public class Conversation {
     private LocalDateTime closedAt;
 
     public void addMessage(Message message){
+    	
+    	if(this.messages == null) {
+    		this.messages = new ArrayList<>();
+    	}
         messages.add(message);
         message.setConversation(this);
     }
