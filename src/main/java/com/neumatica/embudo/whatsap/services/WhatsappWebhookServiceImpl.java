@@ -117,10 +117,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	        }
 	
 	        case EMAIL -> processEmail(contact, messageDTO);
+	        
+	        case CITY -> processCity(contact, messageDTO);
 	
 	        case COUNTRY -> processCountry(contact, messageDTO);
-	
-	        case CITY -> processCity(contact, messageDTO);
 	
 	        case COMPLETED -> whatsappResponseAutimatics.sendText(
 	                contact.getPhone(),
