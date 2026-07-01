@@ -91,6 +91,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	        System.out.println("Webhook recibido sin mensajes. Se ignora.");
 	        return;
 	    }
+	    
+	    MessageDto messageDTO = value.getMessages().getFirst();
 
 	    // No hay contactos
 	    if (value.getContacts() == null || value.getContacts().isEmpty()) {
@@ -99,8 +101,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	    }
 
         ContactDto contactDTO = value.getContacts().getFirst();
-
-        MessageDto messageDTO = value.getMessages().getFirst();
 
         Contact contact = this.getOrCreateContact(contactDTO);
 
