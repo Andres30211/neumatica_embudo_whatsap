@@ -86,9 +86,17 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
                 .getFirst()
                 .getValue();
 		
-		if(value.getMessages().getFirst() == null) {
-			return;
-		}
+		// No hay mensajes
+	    if (value.getMessages() == null || value.getMessages().isEmpty()) {
+	        System.out.println("Webhook recibido sin mensajes. Se ignora.");
+	        return;
+	    }
+
+	    // No hay contactos
+	    if (value.getContacts() == null || value.getContacts().isEmpty()) {
+	        System.out.println("Webhook recibido sin contactos. Se ignora.");
+	        return;
+	    }
 
         ContactDto contactDTO = value.getContacts().getFirst();
 
@@ -126,10 +134,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	        case COUNTRY -> processCountry(contact, messageDTO);
 	
-	        /*case COMPLETED -> whatsappResponseAutimatics.sendText(
+	        case COMPLETED -> whatsappResponseAutimatics.sendText(
 	                contact.getPhone(),
 	                "En unos minutos un asesor continuará con tu atención."
-	        );*/
+	        );
 	    }
     }
 
@@ -240,8 +248,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     
     private void processCountry(Contact contact,
             MessageDto messageDTO){
-
-    	System.out.println(contact.getRegistrationStep());
     	
 		contact.setCountry(
 		messageDTO.getText().getBody()
@@ -252,8 +258,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		);
 		
 		contactRepository.save(contact);
-		
-		System.out.println(contact.getRegistrationStep());
 		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
