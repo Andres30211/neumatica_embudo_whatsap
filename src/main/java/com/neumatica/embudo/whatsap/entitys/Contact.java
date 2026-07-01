@@ -71,6 +71,7 @@ public class Contact {
      */
     private String country;
     
+    @Enumerated(EnumType.STRING)
     private RegistrationStep registrationStep;
     
     @OneToMany(mappedBy = "contact", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
