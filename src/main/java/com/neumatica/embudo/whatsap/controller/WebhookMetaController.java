@@ -34,18 +34,18 @@ public class WebhookMetaController {
 		return ResponseEntity.ok(this.whatsappWebhookService.contacts());
 	}
 	
-	@PostMapping
+	/*@PostMapping
     public void webhook(@RequestBody String json) {
 		
 		System.out.println(json);
-    }
+    }*/
 	
-	/*@PostMapping
+	@PostMapping
     public ResponseEntity<String> webhook(@RequestBody WhatsappWebHookDto webhook) {
 		
 		System.out.println(webhook);
 		this.whatsappWebhookService.processWebhook(webhook);
 
         return ResponseEntity.ok().build();
-    }*/
+    }
 }

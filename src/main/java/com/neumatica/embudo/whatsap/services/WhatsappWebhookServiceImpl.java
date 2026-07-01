@@ -86,6 +86,18 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
                 .getFirst()
                 .getValue();
 		
+		// Ignorar estados de entrega, leído, enviado, etc.
+		if (!value.getStatuses().isEmpty()) {
+
+		    System.out.println("Webhook de estado recibido");
+
+		    value.getStatuses().forEach(status ->
+		        System.out.println(status.getStatus())
+		    );
+
+		    return;
+		}
+		
 		// No hay mensajes
 	    if (value.getMessages() == null || value.getMessages().isEmpty()) {
 	        System.out.println("Webhook recibido sin mensajes. Se ignora.");

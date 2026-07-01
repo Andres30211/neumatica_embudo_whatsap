@@ -18,5 +18,7 @@ public class ValueDto {
     private List<ContactDto> contacts;
 
     private List<MessageDto> messages = new ArrayList<>();
+    
+    private List<StatusDto> statuses = new ArrayList<>();
 	
 }
