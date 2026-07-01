@@ -122,10 +122,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	        case COUNTRY -> processCountry(contact, messageDTO);
 	
-	        case COMPLETED -> whatsappResponseAutimatics.sendText(
+	        /*case COMPLETED -> whatsappResponseAutimatics.sendText(
 	                contact.getPhone(),
 	                "En unos minutos un asesor continuará con tu atención."
-	        );
+	        );*/
 	    }
     }
 
