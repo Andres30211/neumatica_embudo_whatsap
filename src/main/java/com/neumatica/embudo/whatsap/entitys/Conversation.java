@@ -47,7 +47,6 @@ public class Conversation {
     @JoinColumn(name = "contact_id")
     private Contact contact;
 	
-	@Builder.Default
 	@OneToMany(mappedBy = "conversation",
 	           cascade = CascadeType.ALL,
 	           fetch = FetchType.LAZY,
