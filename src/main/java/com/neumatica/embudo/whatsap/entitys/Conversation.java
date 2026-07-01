@@ -47,11 +47,12 @@ public class Conversation {
     @JoinColumn(name = "contact_id")
     private Contact contact;
 	
+	@Builder.Default
 	@OneToMany(mappedBy = "conversation",
 	           cascade = CascadeType.ALL,
 	           fetch = FetchType.LAZY,
 	           orphanRemoval = true)
-	private List<Message> messages = new ArrayList<>();
+	private List<Message> messages;
 
     @Enumerated(EnumType.STRING)
     private ConversationStatus status;

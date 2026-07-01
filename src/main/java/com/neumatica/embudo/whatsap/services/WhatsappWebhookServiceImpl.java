@@ -167,7 +167,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     private void saveMessage(Conversation conversation,
                              MessageDto dto) {
     	
-    	List<Message> messages = conversation.getMessages()
+    	/*List<Message> messages = conversation.getMessages()
     			.stream()
     			.map(m -> new Message(m.getWhatsappMessageId(),
     					conversation,
@@ -184,17 +184,18 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     	
     	conversation.getMessages().clear();
     	conversation.getMessages().addAll(messages);
-    	//conversation.setMessages(messages);
-
-    	this.conversationRepository.save(conversation);
+    	conversation.setMessages(messages);
     	
-        /*if (this.messageRepository.existsByWhatsappMessageId(dto.getId())) {
+
+    	this.conversationRepository.save(conversation);*/
+    	
+        if (this.messageRepository.existsByWhatsappMessageId(dto.getId())) {
             return;
         }
 
         Message message = this.messageMapper.toEntity(dto, conversation);
 
-        this.messageRepository.save(message);
+        conversation.addMessage(message);
         
         conversation.setLastMessageAt(
         	    Instant.ofEpochSecond(Long.parseLong(dto.getTimestamp()))
@@ -202,7 +203,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         	           .toLocalDateTime()
         	);
 
-        this.conversationRepository.save(conversation);*/
+        this.conversationRepository.save(conversation);
 
     }
 
