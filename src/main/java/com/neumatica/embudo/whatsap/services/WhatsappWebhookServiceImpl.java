@@ -203,7 +203,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		
 		contact.setEmail(email);
 		
-		contact.setRegistrationStep(RegistrationStep.COUNTRY);
+		contact.setRegistrationStep(RegistrationStep.CITY);
 		
 		contactRepository.save(contact);
 		
@@ -222,7 +222,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		);
 		
 		contact.setRegistrationStep(
-		RegistrationStep.COMPLETED
+		RegistrationStep.COUNTRY
 		);
 		
 		contactRepository.save(contact);
@@ -242,7 +242,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		);
 		
 		contact.setRegistrationStep(
-		RegistrationStep.CITY
+		RegistrationStep.COMPLETED
 		);
 		
 		contactRepository.save(contact);
