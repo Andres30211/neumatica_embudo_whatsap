@@ -35,12 +35,17 @@ public class WebhookMetaController {
 	}
 	
 	@PostMapping
-    public ResponseEntity<String> webhook(@RequestBody String json) {
+    public void webhook(@RequestBody String json) {
 		
-    	System.out.println(json);
-		/*System.out.println(webhook);
-		this.whatsappWebhookService.processWebhook(webhook);*/
+		System.out.println(json);
+    }
+	
+	/*@PostMapping
+    public ResponseEntity<String> webhook(@RequestBody WhatsappWebHookDto webhook) {
+		
+		System.out.println(webhook);
+		this.whatsappWebhookService.processWebhook(webhook);
 
         return ResponseEntity.ok().build();
-    }
+    }*/
 }
