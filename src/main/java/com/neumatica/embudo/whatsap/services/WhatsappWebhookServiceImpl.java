@@ -78,11 +78,17 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	@Override
 	public void processWebhook(WhatsappWebHookDto webhook) {
 		
+		
+		
 		ValueDto value = webhook.getEntry()
                 .getFirst()
                 .getChanges()
                 .getFirst()
                 .getValue();
+		
+		if(value.getMessages().getFirst() == null) {
+			return;
+		}
 
         ContactDto contactDTO = value.getContacts().getFirst();
 
