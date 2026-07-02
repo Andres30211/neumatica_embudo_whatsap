@@ -237,6 +237,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		
 		contactRepository.save(contact);
 		
+		this.notificationService.sendNewContact(contact);
+		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
 		"Perfecto 😊\nAhora escribe tu ciudad."
@@ -257,6 +259,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		
 		contactRepository.save(contact);
 		
+		this.notificationService.sendNewContact(contact);
+		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
 		"Gracias. \nAhora escribe tu pais"
@@ -276,6 +280,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		);
 		
 		contactRepository.save(contact);
+		
+		this.notificationService.sendNewContact(contact);
 		
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
