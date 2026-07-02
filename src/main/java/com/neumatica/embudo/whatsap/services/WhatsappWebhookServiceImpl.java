@@ -135,8 +135,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	                    contact.getPhone(),
 	                    "Hola " + contact.getName()
 	                    + " 👋\n\n"
-	                    + "Bienvenido a Léxico Digital.\n\n"
-	                    + "Para comenzar necesito tu correo electrónico."
+	                    + "Bienvenido a Neumatica Industrial.\n\n"
+	                    + "Para comenzar necesitamos tu correo electrónico."
 	            );
 	        }
 	
@@ -146,10 +146,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	        case COUNTRY -> processCountry(contact, messageDTO);
 	
-	        case COMPLETED -> whatsappResponseAutimatics.sendText(
+	        /*case COMPLETED -> whatsappResponseAutimatics.sendText(
 	                contact.getPhone(),
 	                "En unos minutos un asesor continuará con tu atención."
-	        );
+	        );*/
 	    }
     }
 
