@@ -62,14 +62,9 @@ public class Contact {
     private String email;
 
     /**
-     * Ciudad
+     * Empresa
      */
-    private String city;
-
-    /**
-     * País
-     */
-    private String country;
+    private String company;
     
     @Enumerated(EnumType.STRING)
     private RegistrationStep registrationStep;

@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -146,16 +148,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	            );
 	        }
 	
-	        case EMAIL -> processEmail(contact, messageDTO);
-	        
-	        case CITY -> processCity(contact, messageDTO);
+	        case EMAIL -> processEmailAndCompany(contact, messageDTO);
 	
-	        case COUNTRY -> processCountry(contact, messageDTO);
-	
-	        /*case COMPLETED -> whatsappResponseAutimatics.sendText(
-	                contact.getPhone(),
-	                "En unos minutos un asesor continuará con tu atención."
-	        );*/
 	    }
     }
 
@@ -227,9 +221,24 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     }
 
-    private void processEmail(Contact contact, MessageDto messageDTO){
+    public void processEmailAndCompany(Contact contact, MessageDto messageDTO){
+    	
+    	Pattern pattern = Pattern.compile(
+    		    "^\\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})\\s*\\r?\\n\\s*(.+?)\\s*$",
+    		    Pattern.MULTILINE
+    		);
 
-		String email = messageDTO.getText().getBody();
+    		Matcher matcher = pattern.matcher(messageDTO.getText().getBody());
+
+    		if (matcher.find()) {
+    		    String email = matcher.group(1);
+    		    String empresa = matcher.group(2);
+
+    		    System.out.println("Email: " + email);
+    		    System.out.println("Empresa: " + empresa);
+    		}
+
+		/*String email = messageDTO.getText().getBody();
 		
 		contact.setEmail(email);
 		
@@ -242,53 +251,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		whatsappResponseAutimatics.sendText(
 		contact.getPhone(),
 		"Perfecto 😊\nAhora escribe tu ciudad."
-		);
+		);*/
 
     }
-    
-    private void processCity(Contact contact,
-            MessageDto messageDTO){
-
-		contact.setCity(
-		messageDTO.getText().getBody()
-		);
-		
-		contact.setRegistrationStep(
-		RegistrationStep.COUNTRY
-		);
-		
-		contactRepository.save(contact);
-		
-		this.notificationService.sendNewContact(contact);
-		
-		whatsappResponseAutimatics.sendText(
-		contact.getPhone(),
-		"Gracias. \nAhora escribe tu pais"
-		);
-		
-    }
-    
-    private void processCountry(Contact contact,
-            MessageDto messageDTO){
-    	
-		contact.setCountry(
-		messageDTO.getText().getBody()
-		);
-		
-		contact.setRegistrationStep(
-		RegistrationStep.COMPLETED
-		);
-		
-		contactRepository.save(contact);
-		
-		this.notificationService.sendNewContact(contact);
-		
-		whatsappResponseAutimatics.sendText(
-		contact.getPhone(),
-		"✅ Registro completado.\nEn unos minutos un asesor te atenderá."
-		);
-		
-	}
 
 	@Override
 	public void delete(UUID id) {
