@@ -121,20 +121,19 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         ContactDto contactDTO = value.getContacts().getFirst();
 
         Contact contact = this.getOrCreateContact(contactDTO);
-        
-        this.notificationService.sendNewContact(contact);
 
         Conversation conversation = getOrCreateConversation(contact);
         
         saveMessage(conversation, messageDTO);
         
+        this.notificationService.sendNewContact(contact);
         
         switch (contact.getRegistrationStep()) {
 
 	        case GREETING -> {
 	
 	            contact.setRegistrationStep(
-	                    RegistrationStep.EMAIL
+	                    RegistrationStep.EMAILANDCOMPANY
 	            );
 	
 	            contactRepository.save(contact);
@@ -144,11 +143,13 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	                    "Hola " + contact.getName()
 	                    + " 👋\n\n"
 	                    + "Bienvenido a Neumatica Industrial.\n\n"
-	                    + "Para comenzar necesitamos tu correo electrónico."
+	                    + "Para comenzar necesitamos:\n\n"
+	                    + "1. Email\n\n"
+	                    + "2. Nombre de la empresa"
 	            );
 	        }
 	
-	        case EMAIL -> processEmailAndCompany(contact, messageDTO);
+	        case EMAILANDCOMPANY -> processEmailAndCompany(contact, messageDTO);
 	
 	    }
     }
@@ -234,24 +235,17 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    String email = matcher.group(1);
     		    String empresa = matcher.group(2);
 
-    		    System.out.println("Email: " + email);
-    		    System.out.println("Empresa: " + empresa);
+    		    contact.setEmail(email);
+    		    contact.setCompany(empresa);
+    		    
+    		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
+    		    
+    		    contactRepository.save(contact);
+    			
+    			this.notificationService.sendNewContact(contact);
+    			
+    			whatsappResponseAutimatics.sendText(contact.getPhone(), "Perfecto ".concat(contact.getName()).concat("\nEn unos minútos un asesor se comunicara con tigo..."));
     		}
-
-		/*String email = messageDTO.getText().getBody();
-		
-		contact.setEmail(email);
-		
-		contact.setRegistrationStep(RegistrationStep.CITY);
-		
-		contactRepository.save(contact);
-		
-		this.notificationService.sendNewContact(contact);
-		
-		whatsappResponseAutimatics.sendText(
-		contact.getPhone(),
-		"Perfecto 😊\nAhora escribe tu ciudad."
-		);*/
 
     }
 

@@ -4,11 +4,7 @@ public enum RegistrationStep {
 
 	GREETING,
 	
-	EMAIL,
-
-    COUNTRY,
-
-    CITY,
+	EMAILANDCOMPANY,
 
     COMPLETED
 }
