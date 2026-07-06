@@ -44,7 +44,7 @@ public class WebhookMetaController {
 	@PostMapping
     public void webhook(@RequestBody WhatsappWebHookDto json) {
 		
-		this.impl.processEmailAndCompany(new Contact(), (MessageDto) json.getEntry().getFirst().getChanges().getFirst().getValue().getMessages());
+		this.impl.processEmailAndCompany(new Contact(), (MessageDto) json.getEntry().getFirst().getChanges().getFirst().getValue().getMessages().getFirst());
 		System.out.println(json);
     }
 	
