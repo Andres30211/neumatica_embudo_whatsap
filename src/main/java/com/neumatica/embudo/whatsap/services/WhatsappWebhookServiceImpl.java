@@ -144,7 +144,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	                    + " 👋\n\n"
 	                    + "Bienvenido a Neumatica Industrial.\n\n"
 	                    + "Para comenzar necesitamos:\n\n"
-	                    + "1. Email\n\n"
+	                    + "1. Email\n"
 	                    + "2. Nombre de la empresa"
 	            );
 	        }
