@@ -11,7 +11,7 @@ public class SendGridConfig {
 	private String apiKey = "46zK1DiwQtyW1zYHijjfnw";
 	
 	@Bean
-	private SendGrid sendGrid() {
+	public SendGrid sendGrid() {
 		return new SendGrid(apiKey);
 	}
 }
