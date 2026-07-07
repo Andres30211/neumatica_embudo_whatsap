@@ -22,11 +22,12 @@ public class SendGridServices {
 	@Autowired
 	private SendGrid sendGrid;
 	
-	private String sender = "felifit27@gmail.com";
+	@Autowired
+	private String returnSender;
 	
 	public void sendEmail(EmailRequestDto request) throws IOException {
 
-        Email from = new Email(this.sender);
+        Email from = new Email(this.returnSender);
 
         Email to = new Email(request.getTo());
 
@@ -43,6 +44,8 @@ public class SendGridServices {
         sgRequest.setBody(mail.build());
 
         this.sendGrid.api(sgRequest);
+        
+        System.out.println("Email enviado...");
 
     }
 }
