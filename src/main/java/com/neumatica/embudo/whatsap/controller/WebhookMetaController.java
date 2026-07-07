@@ -51,7 +51,7 @@ public class WebhookMetaController {
     public ResponseEntity<String> webhook(@RequestBody WhatsappWebHookDto webhook) {
 		
 		System.out.println(webhook);
-		//this.whatsappWebhookService.processWebhook(webhook);
+		this.whatsappWebhookService.processWebhook(webhook);
 
         return ResponseEntity.ok().build();
     }
