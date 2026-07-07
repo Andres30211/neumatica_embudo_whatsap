@@ -43,7 +43,9 @@ public class MessageMapper {
 				
 				    message.setMediaId(dto.getImage().getId());
 				
-				    message.setCaption(dto.getImage().getCaption());
+				    //message.setCaption(dto.getImage().getCaption());
+				    
+				    message.setBody(dto.getImage().getCaption());
 				
 				    message.setMimeType(dto.getImage().getMimeType());
 				
