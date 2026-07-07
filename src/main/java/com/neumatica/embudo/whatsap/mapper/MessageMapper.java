@@ -42,8 +42,6 @@ public class MessageMapper {
 				if(dto.getImage()!=null){
 				
 				    message.setMediaId(dto.getImage().getId());
-				
-				    //message.setCaption(dto.getImage().getCaption());
 				    
 				    message.setBody(dto.getImage().getCaption());
 				
@@ -61,7 +59,7 @@ public class MessageMapper {
 				
 				    message.setMediaId(dto.getVideo().getId());
 				
-				    message.setCaption(dto.getVideo().getCaption());
+				    message.setBody(dto.getImage().getCaption());
 				
 				    message.setMimeType(dto.getVideo().getMimeType());
 				
@@ -93,7 +91,7 @@ public class MessageMapper {
 				
 				    message.setMimeType(dto.getDocument().getMimeType());
 				
-				    message.setCaption(dto.getDocument().getCaption());
+				    message.setBody(dto.getImage().getCaption());
 				
 				    message.setSha256(dto.getDocument().getSha256());
 				
