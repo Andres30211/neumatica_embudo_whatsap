@@ -1,6 +1,5 @@
 package com.neumatica.embudo.whatsap.services;
 
-import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -8,12 +7,11 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.neumatica.embudo.whatsap.dto.sendgrid.EmailRequestDto;
+import com.neumatica.embudo.whatsap.dto.brevo.EmailRequestDto;
 import com.neumatica.embudo.whatsap.dto.webhook.ContactDto;
 import com.neumatica.embudo.whatsap.dto.webhook.MessageDto;
 import com.neumatica.embudo.whatsap.dto.webhook.ValueDto;
@@ -59,7 +57,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	private NotificationService notificationService;
 	
 	@Autowired
-	private SendGridServices sendGridServices;
+	private BrevoEmailServices brevoEmailServices;
 	
 	@Override
 	public List<Contact> contacts() {
@@ -245,10 +243,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
     		    
-    		    EmailRequestDto emailRequestDto = new EmailRequestDto(email, "Saludo Inicial...", "Hola ".concat(empresa).concat("Como estas ?"));
+    		    EmailRequestDto emailRequestDto = new EmailRequestDto(email, empresa, "Saludo inicial...", "<h1>Hola desde neumatica industrial...</h1>");
     		    try {
-					this.sendGridServices.sendEmail(emailRequestDto);
-				} catch (IOException e) {
+					this.brevoEmailServices.sendEmail(emailRequestDto);
+				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}

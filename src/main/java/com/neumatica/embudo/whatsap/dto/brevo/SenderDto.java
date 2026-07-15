@@ -1,4 +1,4 @@
-package com.neumatica.embudo.whatsap.dto.sendgrid;
+package com.neumatica.embudo.whatsap.dto.brevo;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -9,11 +9,9 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class EmailRequestDto {
+public class SenderDto {
 
-	private String to;
+    private String name;
 
-    private String subject;
-
-    private String message;
+    private String email;
 }
