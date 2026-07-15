@@ -66,6 +66,9 @@ public class BrevoEmailServices {
                 new HttpEntity<>(body, headers);
 
         try {
+        	
+        	System.out.println("Sender Name: " + this.brevoSenderName);
+        	System.out.println("Sender Email: " + this.brevoSenderEmail);
 
             ResponseEntity<String> response =
                     restTemplate.exchange(
