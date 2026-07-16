@@ -139,9 +139,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	                    RegistrationStep.EMAILANDCOMPANY
 	            );
 	
-	            contactRepository.save(contact);
+	            this.contactRepository.save(contact);
 	
-	            whatsappResponseAutimatics.sendText(
+	            this.whatsappResponseAutimatics.sendText(
 	                    contact.getPhone(),
 	                    "Hola " + contact.getName()
 	                    + " 👋\n\n"
@@ -153,6 +153,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	        }
 	
 	        case EMAILANDCOMPANY -> processEmailAndCompany(contact, messageDTO);
+	        
+	        case COMPLETED -> this.whatsappResponseAutimatics.sendText(contact.getPhone(), contact.getName().concat("\nRevisaremos tus datos y en unos minútos un asesor se comunicara con tigo..."));
 	
 	    }
     }
@@ -255,7 +257,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     			
     			this.notificationService.sendNewContact(contact);
     			
-    			whatsappResponseAutimatics.sendText(contact.getPhone(), "Perfecto ".concat(contact.getName()).concat("\nEn unos minútos un asesor se comunicara con tigo..."));
+    			this.whatsappResponseAutimatics.sendText(contact.getPhone(), "Perfecto ".concat(contact.getName()).concat("\nEn unos minútos un asesor se comunicara con tigo..."));
     		}
 
     }
