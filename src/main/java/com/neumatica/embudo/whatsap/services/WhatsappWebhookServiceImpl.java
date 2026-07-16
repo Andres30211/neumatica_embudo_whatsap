@@ -143,8 +143,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	            this.whatsappResponseAutimatics.sendText(
 	                    contact.getPhone(),
-	                    "Hola " + contact.getName()
-	                    + " 👋\n\n"
+	                    "Hola " + contact.getName() + " 👋\n"
 	                    + "Bienvenido a Neumatica Industrial.\n\n"
 	                    + "Para comenzar necesitamos:\n\n"
 	                    + "1. Email\n"
@@ -154,7 +153,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	        case EMAILANDCOMPANY -> processEmailAndCompany(contact, messageDTO);
 	        
-	        case COMPLETED -> this.whatsappResponseAutimatics.sendText(contact.getPhone(), contact.getName().concat("\nRevisaremos tus datos y en unos minútos un asesor se comunicara con tigo..."));
+	        case COMPLETED -> this.whatsappResponseAutimatics.sendText(contact.getPhone(),
+	        		"Hola ".concat(contact.getName()).concat("\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."));
 	
 	    }
     }

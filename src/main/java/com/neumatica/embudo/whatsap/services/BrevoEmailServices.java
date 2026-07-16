@@ -53,6 +53,8 @@ public class BrevoEmailServices {
         body.setSubject(emailRequest.getSubject());
 
         body.setHtmlContent(emailRequest.getHtml());
+        
+        body.setTemplateId(3L);
 
         HttpHeaders headers = new HttpHeaders();
 
