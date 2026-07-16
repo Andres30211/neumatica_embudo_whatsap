@@ -14,5 +14,5 @@ public class EmailRequestDto {
 	private String to;
     private String name;
     private String subject;
-    private String html;
+    //private String html;
 }

@@ -245,7 +245,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
     		    
-    		    EmailRequestDto emailRequestDto = new EmailRequestDto(email, empresa, "Saludo inicial...", "<h1>Hola desde neumatica industrial...</h1>");
+    		    EmailRequestDto emailRequestDto = new EmailRequestDto(email, empresa, "Saludo inicial..."/*, "<h1>Hola desde neumatica industrial...</h1>"*/);
     		    try {
 					this.brevoEmailServices.sendEmail(emailRequestDto);
 				} catch (Exception e) {
