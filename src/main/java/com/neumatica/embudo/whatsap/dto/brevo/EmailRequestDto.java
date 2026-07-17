@@ -12,7 +12,7 @@ import lombok.Setter;
 public class EmailRequestDto {
 
 	private String to;
-    private String name;
-    private String subject;
+    //private String name;
+    //private String subject;
     //private String html;
 }

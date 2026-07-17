@@ -245,7 +245,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
     		    
-    		    EmailRequestDto emailRequestDto = new EmailRequestDto(email, empresa, "Saludo inicial..."/*, "<h1>Hola desde neumatica industrial...</h1>"*/);
+    		    this.whatsappResponseAutimatics.sendText(contact.getPhone(), "Perfecto ".concat(contact.getName()).concat("\nEn unos minútos un asesor se comunicara con tigo..."));
+    		    
+    		    EmailRequestDto emailRequestDto = new EmailRequestDto(email/*, empresa, "Saludo inicial...", "<h1>Hola desde neumatica industrial...</h1>"*/);
     		    try {
 					this.brevoEmailServices.sendEmail(emailRequestDto);
 				} catch (Exception e) {
@@ -257,7 +259,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     			
     			this.notificationService.sendNewContact(contact);
     			
-    			this.whatsappResponseAutimatics.sendText(contact.getPhone(), "Perfecto ".concat(contact.getName()).concat("\nEn unos minútos un asesor se comunicara con tigo..."));
+    			
     		}
 
     }

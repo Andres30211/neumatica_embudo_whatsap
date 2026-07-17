@@ -19,6 +19,6 @@ public class BrevoEmailRequest {
 	private SenderDto senderDto;
     private List<RecipientDto> to;
     private String subject;
-    private String htmlContent;
+    //private String htmlContent;
     private Long templateId;
 }

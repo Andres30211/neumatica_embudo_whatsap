@@ -41,16 +41,16 @@ public class BrevoEmailServices {
 
 		BrevoEmailRequest body = new BrevoEmailRequest();
 
-        body.setSenderDto(new SenderDto(this.brevoSenderName, this.brevoSenderEmail));
+        body.setSenderDto(new SenderDto(/*this.brevoSenderName,*/ this.brevoSenderEmail));
 
         body.setTo(List.of(
                 new RecipientDto(
-                		emailRequest.getTo(),
-                		emailRequest.getName()
+                		emailRequest.getTo()/*,
+                		emailRequest.getName()*/
                 )
         ));
 
-        body.setSubject(emailRequest.getSubject());
+        //body.setSubject(emailRequest.getSubject());
 
         //body.setHtmlContent(emailRequest.getHtml());
         
