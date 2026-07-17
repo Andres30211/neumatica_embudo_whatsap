@@ -143,11 +143,11 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	            this.whatsappResponseAutimatics.sendText(
 	                    contact.getPhone(),
-	                    "Hola " + contact.getName() + " 👋\n"
-	                    + "Bienvenido a Neumatica Industrial.\n\n"
-	                    + "Para comenzar necesitamos:\n\n"
-	                    + "1. Email\n"
-	                    + "2. Nombre de la empresa"
+	                    " Bienvenido a Neumática Industrial S.A.S.\n"
+	                    .concat("Especialistas en automatización, neumática y aire comprimido.\n")
+	                    .concat("Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n")
+	                    .concat(". Nombre de la empresa (sin caracteres especiales)\n")
+	                    .concat(". Correo electrónico (en minúscula)")
 	            );
 	        }
 	
@@ -245,7 +245,12 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
     		    
-    		    this.whatsappResponseAutimatics.sendText(contact.getPhone(), "Perfecto ".concat(contact.getName()).concat("\nEn unos minútos un asesor se comunicara con tigo..."));
+    		    this.whatsappResponseAutimatics.sendText(contact.getPhone(),
+    		    		contact.getName()
+    		    		.concat("  ¡Gracias!\n")
+    		    		.concat("Hemos recibido tu información correctamente.")
+    		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
+    		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
     		    
     		    EmailRequestDto emailRequestDto = new EmailRequestDto(email/*, empresa, "Saludo inicial...", "<h1>Hola desde neumatica industrial...</h1>"*/);
     		    try {
