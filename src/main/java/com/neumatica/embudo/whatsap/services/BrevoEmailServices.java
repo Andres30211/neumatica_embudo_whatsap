@@ -1,5 +1,7 @@
 package com.neumatica.embudo.whatsap.services;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -41,20 +43,22 @@ public class BrevoEmailServices {
 
 		BrevoEmailRequest body = new BrevoEmailRequest();
 
-        body.setSenderDto(new SenderDto(/*this.brevoSenderName,*/ this.brevoSenderEmail));
+        body.setSenderDto(new SenderDto(this.brevoSenderEmail));
 
         body.setTo(List.of(
                 new RecipientDto(
-                		emailRequest.getTo()/*,
-                		emailRequest.getName()*/
+                		emailRequest.getTo()
                 )
         ));
-
-        //body.setSubject(emailRequest.getSubject());
-
-        //body.setHtmlContent(emailRequest.getHtml());
         
         body.setTemplateId(idTemplate);
+        
+        Map<String, String> params = new HashMap<>();
+        params.put("email", emailRequest.getTo());
+        params.put("name", emailRequest.getName());
+        params.put("company", emailRequest.getCompany());
+        
+        body.setParams(params);
 
         HttpHeaders headers = new HttpHeaders();
 

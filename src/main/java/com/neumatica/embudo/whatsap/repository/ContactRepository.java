@@ -14,9 +14,9 @@ import com.neumatica.embudo.whatsap.entitys.Contact;
 public interface ContactRepository extends JpaRepository<Contact, UUID>{
 	
 	@Query("""
-			select c.email from Contact c
+			select c.email, c.name, c.company from Contact c
 			""")
-	List<String> findAllEmails();
+	List<Contact> findAllEmails();
 
 	Optional<Contact> findByPhone(String phone);
 }

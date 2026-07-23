@@ -1,6 +1,7 @@
 package com.neumatica.embudo.whatsap.dto.brevo;
 
 import java.util.List;
+import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -19,6 +20,6 @@ public class BrevoEmailRequest {
 	private SenderDto senderDto;
     private List<RecipientDto> to;
     private String subject;
-    //private String htmlContent;
     private Long templateId;
+    private Map<String, String> params;
 }

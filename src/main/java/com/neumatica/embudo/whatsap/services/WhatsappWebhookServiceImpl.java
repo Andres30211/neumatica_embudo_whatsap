@@ -147,7 +147,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	                    " Bienvenido a Neumática Industrial S.A.S.\n"
 	                    .concat("Especialistas en automatización, neumática y aire comprimido.\n")
 	                    .concat("Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n")
-	                    .concat(". Correo electrónico (en minúscula)")
+	                    .concat(". Correo electrónico (en minúscula)\n")
 	                    .concat(". Nombre de la empresa (sin caracteres especiales)\n")
 	            );
 	        }
@@ -239,10 +239,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     		if (matcher.find()) {
     		    String email = matcher.group(1);
-    		    String empresa = matcher.group(2);
+    		    String company = matcher.group(2);
 
     		    contact.setEmail(email);
-    		    contact.setCompany(empresa);
+    		    contact.setCompany(company);
     		    
     		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
     		    
@@ -253,7 +253,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
     		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
     		    
-    		    EmailRequestDto emailRequestDto = new EmailRequestDto(email/*, empresa, "Saludo inicial...", "<h1>Hola desde neumatica industrial...</h1>"*/);
+    		    EmailRequestDto emailRequestDto = new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany());
     		    try {
 					this.brevoEmailServices.sendEmail(emailRequestDto, 3L);
 				} catch (Exception e) {
@@ -273,14 +273,14 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     @Async
     public void sendCampaing() {
     	
-    	List<String> emails = this.contactRepository.findAllEmails();
+    	List<Contact> emails = this.contactRepository.findAllEmails();
     	
     	emails.stream()
-    		.forEach(email ->{
+    		.forEach(contact ->{
     			try {
-    				this.brevoEmailServices.sendEmail(new EmailRequestDto(email), 3L);
+    				this.brevoEmailServices.sendEmail(new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany()), 3L);
 				} catch (Exception e) {
-					System.out.println("Error enviado a: ".concat(email));
+					System.out.println("Error enviado a: ".concat(contact.getEmail()));
 				}
     			
     		});
