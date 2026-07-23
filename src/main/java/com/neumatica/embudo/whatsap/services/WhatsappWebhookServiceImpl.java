@@ -9,6 +9,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.neumatica.embudo.whatsap.dto.brevo.EmailRequestDto;
@@ -146,8 +147,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	                    " Bienvenido a Neumática Industrial S.A.S.\n"
 	                    .concat("Especialistas en automatización, neumática y aire comprimido.\n")
 	                    .concat("Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n")
-	                    .concat(". Nombre de la empresa (sin caracteres especiales)\n")
 	                    .concat(". Correo electrónico (en minúscula)")
+	                    .concat(". Nombre de la empresa (sin caracteres especiales)\n")
 	            );
 	        }
 	
@@ -254,7 +255,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    EmailRequestDto emailRequestDto = new EmailRequestDto(email/*, empresa, "Saludo inicial...", "<h1>Hola desde neumatica industrial...</h1>"*/);
     		    try {
-					this.brevoEmailServices.sendEmail(emailRequestDto);
+					this.brevoEmailServices.sendEmail(emailRequestDto, 3L);
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -267,6 +268,22 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     			
     		}
 
+    }
+    
+    @Async
+    public void sendCampaing() {
+    	
+    	List<String> emails = this.contactRepository.findAllEmails();
+    	
+    	emails.stream()
+    		.forEach(email ->{
+    			try {
+    				this.brevoEmailServices.sendEmail(new EmailRequestDto(email), 3L);
+				} catch (Exception e) {
+					System.out.println("Error enviado a: ".concat(email));
+				}
+    			
+    		});
     }
 
 	@Override

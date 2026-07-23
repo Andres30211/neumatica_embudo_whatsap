@@ -37,7 +37,7 @@ public class BrevoEmailServices {
 	@Autowired
 	private String brevoSenderEmail;
 	
-	public void sendEmail(EmailRequestDto emailRequest) {
+	public void sendEmail(EmailRequestDto emailRequest, Long idTemplate) {
 
 		BrevoEmailRequest body = new BrevoEmailRequest();
 
@@ -54,7 +54,7 @@ public class BrevoEmailServices {
 
         //body.setHtmlContent(emailRequest.getHtml());
         
-        body.setTemplateId(3L);
+        body.setTemplateId(idTemplate);
 
         HttpHeaders headers = new HttpHeaders();
 

@@ -55,4 +55,12 @@ public class WebhookMetaController {
 
         return ResponseEntity.ok().build();
     }
+	
+	@PostMapping("/sendCampaing")
+	public ResponseEntity<String> sendCampaing(){
+		
+		this.impl.sendCampaing();
+		
+		return ResponseEntity.ok("Comienzó de envió de Campaña...");
+	}
 }
