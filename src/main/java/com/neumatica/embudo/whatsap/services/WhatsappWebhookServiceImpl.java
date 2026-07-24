@@ -275,8 +275,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     	
     	List<Contact> emails = this.contactRepository.findAllEmails();
     	
-    	emails.stream()
-    		.forEach(contact ->{
+    	emails.forEach(contact ->{
     			try {
     				this.brevoEmailServices.sendEmail(new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany()), 3L);
 				} catch (Exception e) {
