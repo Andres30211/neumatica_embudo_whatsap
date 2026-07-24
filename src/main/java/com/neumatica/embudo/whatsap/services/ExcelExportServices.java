@@ -79,13 +79,13 @@ public class ExcelExportServices {
 
                 Row row = hoja.createRow(fila++);
 
-                row.createCell(1).setCellValue(contact.getName());
+                row.createCell(0).setCellValue(contact.getName());
 
-                row.createCell(2).setCellValue(contact.getPhone());
+                row.createCell(1).setCellValue(contact.getPhone());
 
-                row.createCell(3).setCellValue(contact.getEmail());
+                row.createCell(2).setCellValue(contact.getEmail());
 
-                row.createCell(4).setCellValue(
+                row.createCell(3).setCellValue(
                         contact.getCreatedAt().format(formatter)
                 );
 
