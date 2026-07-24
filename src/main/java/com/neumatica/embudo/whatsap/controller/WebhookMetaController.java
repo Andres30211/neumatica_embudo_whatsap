@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,6 +20,7 @@ import com.neumatica.embudo.whatsap.dto.webhook.MessageDto;
 import com.neumatica.embudo.whatsap.dto.webhook.WhatsappWebHookDto;
 import com.neumatica.embudo.whatsap.entitys.Contact;
 import com.neumatica.embudo.whatsap.repository.WhatsappWebhookService;
+import com.neumatica.embudo.whatsap.services.ExcelExportServices;
 import com.neumatica.embudo.whatsap.services.WhatsappWebhookServiceImpl;
 
 @RestController
@@ -30,6 +33,9 @@ public class WebhookMetaController {
 	
 	@Autowired
 	private WhatsappWebhookServiceImpl impl;
+	
+	@Autowired
+	private ExcelExportServices excelExportServices;
 	
 	@DeleteMapping("/delete/{id}")
 	public void delete(@PathVariable("id") UUID id){
@@ -63,4 +69,21 @@ public class WebhookMetaController {
 		
 		return ResponseEntity.ok("Comienzó de envió de Campaña...");
 	}
+	
+	@GetMapping("/export")
+    public ResponseEntity<byte[]> exportarExcel() {
+
+        byte[] excel = this.excelExportServices.exportContactsExcel();
+
+        return ResponseEntity.ok()
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=contactos.xlsx"
+                )
+                .contentType(
+                        MediaType.APPLICATION_OCTET_STREAM
+                )
+                .body(excel);
+
+    }
 }
