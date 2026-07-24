@@ -25,7 +25,7 @@ import com.neumatica.embudo.whatsap.services.WhatsappWebhookServiceImpl;
 
 @RestController
 @RequestMapping("/webhook")
-@CrossOrigin(origins = {"http://localhost:4200"})
+@CrossOrigin(origins = {"http://localhost:4200", "https://neumatica-crm.netlify.app/"})
 public class WebhookMetaController {
 	
 	@Autowired
