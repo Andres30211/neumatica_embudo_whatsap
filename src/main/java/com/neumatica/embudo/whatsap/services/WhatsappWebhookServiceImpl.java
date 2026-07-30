@@ -255,7 +255,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    EmailRequestDto emailRequestDto = new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany());
     		    try {
-					this.brevoEmailServices.sendEmail(emailRequestDto, 3L);
+					this.brevoEmailServices.sendEmail(emailRequestDto, 4L);
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
@@ -277,7 +277,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     	
     	emails.forEach(contact ->{
     			try {
-    				this.brevoEmailServices.sendEmail(new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany()), 3L);
+    				this.brevoEmailServices.sendEmail(new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany()), 4L);
 				} catch (Exception e) {
 					System.out.println("Error enviado a: ".concat(contact.getEmail()));
 				}
