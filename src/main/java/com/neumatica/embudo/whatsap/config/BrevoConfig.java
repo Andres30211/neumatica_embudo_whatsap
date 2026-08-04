@@ -16,12 +16,6 @@ public class BrevoConfig {
 	@Value("${brevo.api.url}")
 	private String apiUrl;
 	
-	@Value("${brevo.sender.name}")
-	private String senderName;
-	
-	@Value("${brevo.sender.email}")
-	private String email;
-	
 	@Bean
 	public String brevoSenderApiKey() {
 		return this.apiKey;
@@ -30,16 +24,6 @@ public class BrevoConfig {
 	@Bean
 	public String brevoApiUrl() {
 		return this.apiUrl;
-	}
-	
-	@Bean
-	public String brevoSenderName() {
-		return this.senderName;
-	}
-	
-	@Bean
-	public String brevoSenderEmail() {
-		return this.email;
 	}
 	
 	@Bean
