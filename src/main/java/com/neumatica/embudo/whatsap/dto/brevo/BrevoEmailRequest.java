@@ -16,8 +16,8 @@ import lombok.Setter;
 @NoArgsConstructor
 public class BrevoEmailRequest {
 
-	@JsonProperty("sender")
-	private SenderDto senderDto;
+	//@JsonProperty("sender")
+	//private SenderDto senderDto;
     private List<RecipientDto> to;
     private String subject;
     private Long templateId;

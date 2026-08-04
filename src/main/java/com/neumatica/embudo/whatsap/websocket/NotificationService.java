@@ -18,7 +18,7 @@ public class NotificationService {
 
     public void sendNewContact(Contact contact){
 
-        messagingTemplate.convertAndSend(
+        this.messagingTemplate.convertAndSend(
                 "/topic/contacts",
                 contact
         );

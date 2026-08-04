@@ -16,7 +16,6 @@ import org.springframework.web.client.RestTemplate;
 import com.neumatica.embudo.whatsap.dto.brevo.BrevoEmailRequest;
 import com.neumatica.embudo.whatsap.dto.brevo.EmailRequestDto;
 import com.neumatica.embudo.whatsap.dto.brevo.RecipientDto;
-import com.neumatica.embudo.whatsap.dto.brevo.SenderDto;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,17 +32,9 @@ public class BrevoEmailServices {
 	@Autowired
 	private String brevoApiUrl;
 	
-	@Autowired
-	private String brevoSenderName;
-	
-	@Autowired
-	private String brevoSenderEmail;
-	
 	public void sendEmail(EmailRequestDto emailRequest, Long idTemplate) {
 
 		BrevoEmailRequest body = new BrevoEmailRequest();
-
-        body.setSenderDto(new SenderDto(this.brevoSenderEmail));
 
         body.setTo(List.of(
                 new RecipientDto(
@@ -72,9 +63,6 @@ public class BrevoEmailServices {
                 new HttpEntity<>(body, headers);
 
         try {
-        	
-        	System.out.println("Sender Name: " + this.brevoSenderName);
-        	System.out.println("Sender Email: " + this.brevoSenderEmail);
 
             ResponseEntity<String> response =
                     restTemplate.exchange(
