@@ -2,6 +2,7 @@ package com.neumatica.embudo.whatsap.services;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -246,12 +247,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
     		    
-    		    this.whatsappResponseAutimatics.sendText(contact.getPhone(),
-    		    		contact.getName()
-    		    		.concat("  ¡Gracias!\n")
-    		    		.concat("Hemos recibido tu información correctamente.")
-    		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
-    		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
+    		    this.sendMessageByHour(contact);
     		    
     		    EmailRequestDto emailRequestDto = new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany());
     		    try {
@@ -267,7 +263,31 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     			
     			
     		}
+    }
+    
+    public void sendMessageByHour(Contact contact) {
 
+        LocalTime ahora = LocalTime.now(
+            ZoneId.of("America/Bogota")
+        );
+
+        LocalTime horaInicio = LocalTime.of(7, 0);
+        LocalTime horaFin = LocalTime.of(17, 0);
+
+        if (!ahora.isBefore(horaInicio) && ahora.isBefore(horaFin)) {
+        	this.whatsappResponseAutimatics.sendText(contact.getPhone(),
+		    		contact.getName()
+		    		.concat("  ¡Gracias!\n")
+		    		.concat("Hemos recibido tu información correctamente.")
+		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
+		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
+        }
+
+        this.whatsappResponseAutimatics.sendText(contact.getPhone(),
+	    		contact.getName()
+	    		.concat(" Gracias por comunicarte con Neumática Industrial.\n")
+	    		.concat("En este momento nuestro equipo se encuentra fuera del horario de atención. Hemos recibido tu mensaje y uno de nuestros asesores te responderá a primera hora del siguiente día hábil.")
+	    		.concat("Agradecemos tu confianza."));
     }
     
     @Async
