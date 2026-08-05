@@ -281,6 +281,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 		    		.concat("Hemos recibido tu información correctamente.")
 		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
 		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
+        	return;
         }
 
         this.whatsappResponseAutimatics.sendText(contact.getPhone(),
