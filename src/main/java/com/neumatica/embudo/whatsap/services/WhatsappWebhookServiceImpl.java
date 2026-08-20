@@ -10,6 +10,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -62,28 +66,36 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	private BrevoEmailServices brevoEmailServices;
 	
 	@Override
-	public List<Contact> contacts() {
-		
-		List<Contact> contacts = this.contactRepository.findAll();
+	//@Transactional(readOnly = true)
+	public Page<Contact> contacts(int page) {
 
-        for (Contact contact : contacts) {
+	    Pageable pageable = PageRequest.of(
+	            page,
+	            5,
+	            Sort.by(Sort.Direction.DESC, "createdAt")
+	    );
 
-            List<Conversation> conversations =
-                    this.conversationRepository.findByContact(contact);
+	    Page<Contact> contactPage =
+	            this.contactRepository.findAll(pageable);
 
-            for (Conversation conversation : conversations) {
+	    for (Contact contact : contactPage.getContent()) {
 
-                List<Message> messages =
-                        this.messageRepository.findByConversation(conversation);
+	        List<Conversation> conversations =
+	                this.conversationRepository.findByContact(contact);
 
-                conversation.setMessages(messages);
-            }
+	        for (Conversation conversation : conversations) {
 
-            contact.setConversations(conversations);
-        }
+	            List<Message> messages =
+	                    this.messageRepository.findByConversation(conversation);
 
-        return contacts;
-    }
+	            conversation.setMessages(messages);
+	        }
+
+	        contact.setConversations(conversations);
+	    }
+
+	    return contactPage;
+	}
 	
 	@Transactional
 	@Override
