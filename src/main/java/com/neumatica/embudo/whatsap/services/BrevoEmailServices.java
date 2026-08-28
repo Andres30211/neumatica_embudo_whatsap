@@ -34,7 +34,7 @@ public class BrevoEmailServices {
 	
 	public void sendEmail(EmailRequestDto emailRequest, Long idTemplate) {
 
-		BrevoEmailRequest body = new BrevoEmailRequest();
+		/*BrevoEmailRequest body = new BrevoEmailRequest();
 
         body.setTo(List.of(
                 new RecipientDto(
@@ -97,9 +97,43 @@ public class BrevoEmailServices {
 
             throw e;
 
-        }
+        }*/
+		
+		this.testBrevoApiKey();
 
     }
+	
+	public void testBrevoApiKey() {
+
+	    HttpHeaders headers = new HttpHeaders();
+	    headers.set("api-key", this.brevoSenderApiKey);
+	    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+	    HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+	    try {
+
+	        ResponseEntity<String> response = restTemplate.exchange(
+	                "https://api.brevo.com/v3/account",
+	                HttpMethod.GET,
+	                entity,
+	                String.class
+	        );
+
+	        System.out.println("========== BREVO TEST ==========");
+	        System.out.println("Status: " + response.getStatusCode());
+	        System.out.println("Body: " + response.getBody());
+	        System.out.println("================================");
+
+	    } catch (HttpStatusCodeException e) {
+
+	        System.out.println("========== BREVO ERROR ==========");
+	        System.out.println("Status: " + e.getStatusCode());
+	        System.out.println("Body: " + e.getResponseBodyAsString());
+	        System.out.println("================================");
+
+	    }
+	}
 
     
 }
