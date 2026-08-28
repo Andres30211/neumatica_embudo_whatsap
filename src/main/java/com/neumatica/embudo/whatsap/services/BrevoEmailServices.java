@@ -92,13 +92,33 @@ public class BrevoEmailServices {
             System.out.println("Código HTTP: " + e.getStatusCode());
 
             System.out.println("Respuesta Brevo:");
+            
+            this.testBrevoConnection();
 
             System.out.println(e.getResponseBodyAsString());
 
-            throw e;
 
         }
 
     }
+	
+	public void testBrevoConnection() {
+
+	    HttpHeaders headers = new HttpHeaders();
+	    headers.set("api-key", this.brevoSenderApiKey);
+	    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+	    HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+	    ResponseEntity<String> response = restTemplate.exchange(
+	            "https://api.brevo.com/v3/account",
+	            HttpMethod.GET,
+	            entity,
+	            String.class
+	    );
+
+	    System.out.println("Brevo: " + response.getStatusCode());
+	    System.out.println(response.getBody());
+	}
 	
 }
