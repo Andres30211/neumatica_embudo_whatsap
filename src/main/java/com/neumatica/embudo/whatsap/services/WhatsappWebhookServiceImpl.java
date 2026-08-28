@@ -143,6 +143,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         
         saveMessage(conversation, messageDTO);
         
+        this.notificationService.sendNotification(contact);
         this.notificationService.sendNewContact(contact);
         
         switch (contact.getRegistrationStep()) {
