@@ -59,7 +59,7 @@ public class MessageMapper {
 				
 				    message.setMediaId(dto.getVideo().getId());
 				
-				    message.setBody(dto.getImage().getCaption());
+				    message.setBody(dto.getVideo().getCaption());
 				
 				    message.setMimeType(dto.getVideo().getMimeType());
 				
@@ -91,7 +91,7 @@ public class MessageMapper {
 				
 				    message.setMimeType(dto.getDocument().getMimeType());
 				
-				    message.setBody(dto.getImage().getCaption());
+				    message.setBody(dto.getDocument().getCaption());
 				
 				    message.setSha256(dto.getDocument().getSha256());
 				
