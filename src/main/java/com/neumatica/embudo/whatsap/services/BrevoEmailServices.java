@@ -71,6 +71,8 @@ public class BrevoEmailServices {
                             entity,
                             String.class
                     );
+            
+            
 
             System.out.println("Status: " + response.getStatusCode());
 
@@ -79,6 +81,13 @@ public class BrevoEmailServices {
             System.out.println(response.getBody());
 
         } catch (HttpStatusCodeException e) {
+        	System.out.println("Brevo URL: " + brevoApiUrl);
+            System.out.println("Brevo API Key configurada: "
+                    + (brevoSenderApiKey != null && !brevoSenderApiKey.isBlank()));
+
+            if (brevoSenderApiKey != null) {
+                System.out.println("Longitud API Key: " + brevoSenderApiKey.length());
+            }
 
             System.out.println("Código HTTP: " + e.getStatusCode());
 
