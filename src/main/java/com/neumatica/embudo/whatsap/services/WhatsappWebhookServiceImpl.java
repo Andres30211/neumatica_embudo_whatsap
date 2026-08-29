@@ -143,8 +143,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         
         saveMessage(conversation, messageDTO);
         
-        this.notificationService.sendNotification(contact);
-        this.notificationService.sendNewContact(contact);
         
         switch (contact.getRegistrationStep()) {
 
@@ -155,6 +153,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	            );
 	
 	            this.contactRepository.save(contact);
+	            
+	            this.notificationService.sendNotification(contact);
+	            this.notificationService.sendNewContact(contact);
 	
 	            this.whatsappResponseAutimatics.sendText(
 	                    contact.getPhone(),
@@ -166,11 +167,22 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	            );
 	        }
 	
-	        case EMAILANDCOMPANY -> processEmailAndCompany(contact, messageDTO);
+	        case EMAILANDCOMPANY -> {
+	        	
+	        	this.notificationService.sendNotification(contact);
+	            this.notificationService.sendNewContact(contact);
+	            
+	        	processEmailAndCompany(contact, messageDTO);
+	        }
 	        
-	        case COMPLETED -> this.whatsappResponseAutimatics.sendText(contact.getPhone(),
+	        case COMPLETED -> {
+	        	
+	        	this.notificationService.sendNotification(contact);
+	            this.notificationService.sendNewContact(contact);
+	            
+	        	this.whatsappResponseAutimatics.sendText(contact.getPhone(),	        
 	        		"Hola ".concat(contact.getName()).concat("\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."));
-	
+	        }
 	    }
     }
 
