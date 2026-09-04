@@ -102,7 +102,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	    return contactPage;
 	}
 	
-	/**
+	/*
 	 * Procesa el webhook recibido desde WhatsApp.
 	 *
 	 * <p>Este método actúa únicamente como orquestador.
@@ -539,6 +539,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	            .phone(phone)
 	            .metaUserId(metaUserId)
 	            .name(name)
+	            .registrationStep(RegistrationStep.GREETING)
 	            .firstContact(now)
 	            .lastInteraction(now)
 	            .createdAt(now)
