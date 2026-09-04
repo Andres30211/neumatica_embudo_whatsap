@@ -18,7 +18,9 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.neumatica.embudo.whatsap.dto.brevo.EmailRequestDto;
+import com.neumatica.embudo.whatsap.dto.webhook.ChageDto;
 import com.neumatica.embudo.whatsap.dto.webhook.ContactDto;
+import com.neumatica.embudo.whatsap.dto.webhook.EntryDto;
 import com.neumatica.embudo.whatsap.dto.webhook.MessageDto;
 import com.neumatica.embudo.whatsap.dto.webhook.ValueDto;
 import com.neumatica.embudo.whatsap.dto.webhook.WhatsappWebHookDto;
@@ -65,6 +67,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	@Autowired
 	private BrevoEmailServices brevoEmailServices;
 	
+	@Autowired
+	private MessageProcessingService messageProcessingService;
+	
 	@Override
 	//@Transactional(readOnly = true)
 	public Page<Contact> contacts(int page) {
@@ -97,7 +102,452 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	    return contactPage;
 	}
 	
+	/**
+	 * Procesa el webhook recibido desde WhatsApp.
+	 *
+	 * <p>Este método actúa únicamente como orquestador.
+	 * No contiene lógica específica de contactos, conversaciones,
+	 * mensajes o multimedia.
+	 *
+	 * @param webhook webhook recibido desde WhatsApp.
+	 */
 	@Transactional
+	@Override
+	public void processWebhook(WhatsappWebHookDto webhook) {
+
+	    /*
+	     * Validamos que el webhook tenga una estructura
+	     * mínimamente procesable.
+	     */
+	    if (!hasEntries(webhook)) {
+
+	        System.out.println(
+	                "Webhook recibido sin entries."
+	        );
+
+	        return;
+	    }
+
+	    /*
+	     * Un webhook puede contener uno o varios entries.
+	     */
+	    for (EntryDto entry : webhook.getEntry()) {
+
+	        if (entry == null
+	                || entry.getChanges() == null
+	                || entry.getChanges().isEmpty()) {
+
+	            continue;
+	        }
+
+	        /*
+	         * Un entry puede contener uno o varios changes.
+	         */
+	        for (ChageDto change : entry.getChanges()) {
+
+	            if (change == null
+	                    || change.getValue() == null) {
+
+	                continue;
+	            }
+
+	            /*
+	             * Delegamos el procesamiento del value.
+	             */
+	            processValue(
+	                    change.getValue()
+	            );
+	        }
+	    }
+	}
+	
+	/*
+	 * Valida si el webhook contiene al menos un entry
+	 * que pueda ser procesado.
+	 *
+	 * @param webhook webhook recibido desde WhatsApp.
+	 * @return {@code true} si existen entries para procesar;
+	 *         {@code false} en caso contrario.
+	 */
+	private boolean hasEntries(WhatsappWebHookDto webhook) {
+
+	    /*
+	     * El webhook no puede ser procesado si es null.
+	     */
+	    if (webhook == null) {
+	        return false;
+	    }
+
+	    /*
+	     * Validamos que exista la colección de entries
+	     * y que contenga al menos un elemento.
+	     */
+	    return webhook.getEntry() != null
+	            && !webhook.getEntry().isEmpty();
+	}
+	
+	private void processValue(ValueDto value) {
+
+	    /*
+	     * Los statuses representan eventos relacionados
+	     * con mensajes enviados: enviado, entregado,
+	     * leído, etc.
+	     *
+	     * Por ahora los ignoramos.
+	     */
+	    if (value.getStatuses() != null &&
+	        !value.getStatuses().isEmpty()) {
+
+	        System.out.println(
+	            "Webhook de estado recibido"
+	        );
+
+	        value.getStatuses().forEach(status ->
+	            System.out.println(
+	                status.getStatus()
+	            )
+	        );
+
+	        return;
+	    }
+
+	    /*
+	     * Si no existen mensajes, no tenemos nada
+	     * que procesar.
+	     */
+	    if (value.getMessages() == null ||
+	        value.getMessages().isEmpty()) {
+
+	        System.out.println(
+	            "Webhook recibido sin mensajes."
+	        );
+
+	        return;
+	    }
+
+	    /*
+	     * Procesamos cada mensaje individualmente.
+	     */
+	    for (MessageDto messageDTO :
+	            value.getMessages()) {
+
+	        processMessage(
+	            value,
+	            messageDTO
+	        );
+	    }
+	}
+	
+	private void processMessage(
+	        ValueDto value,
+	        MessageDto messageDTO) {
+
+	    if (messageDTO == null) {
+	        return;
+	    }
+
+	    /*
+	     * Intentamos obtener la información del contacto
+	     * asociada al mensaje.
+	     */
+	    ContactDto contactDTO =
+	        findContactForMessage(
+	            value,
+	            messageDTO
+	        );
+
+	    /*
+	     * El contacto puede ser parcial.
+	     *
+	     * No debemos descartar el mensaje simplemente
+	     * porque no exista phone, waId o profile.
+	     */
+	    Contact contact =
+	        this.getOrCreateContact(
+	            contactDTO,
+	            messageDTO
+	        );
+
+	    /*
+	     * Obtenemos o creamos la conversación.
+	     */
+	    Conversation conversation =
+	        this.getOrCreateConversation(
+	            contact
+	        );
+
+	    /*
+	     * Procesamos completamente el mensaje:
+	     *
+	     * TEXT
+	     * IMAGE
+	     * VIDEO
+	     * AUDIO
+	     * DOCUMENT
+	     * STICKER
+	     * ...
+	     *
+	     * Incluyendo descarga de multimedia.
+	     */
+	    messageProcessingService.process(
+	        messageDTO,
+	        conversation
+	    );
+
+	    /*
+	     * A partir de aquí puedes mantener
+	     * tu lógica de negocio actual.
+	     *
+	     * No estamos tocando las respuestas automáticas.
+	     */
+	    processBusinessFlow(
+	        contact,
+	        messageDTO
+	    );
+	}
+	
+	 /*
+	  * Identifica el contacto asociado al mensaje recibido desde WhatsApp.
+	  *
+	  * <p>WhatsApp puede enviar diferentes identificadores dependiendo
+	  * del tipo de evento. Por esta razón, intentamos realizar la
+	  * asociación utilizando los identificadores disponibles.
+	  *
+	  * <p>Orden de búsqueda:
+	  * <ol>
+	  *     <li>Meta User ID ({@code fromUserId}).</li>
+	  *     <li>WhatsApp ID / teléfono ({@code from}).</li>
+	  *     <li>Si solamente existe un contacto en el webhook,
+	  *         se utiliza como fallback.</li>
+	  * </ol>
+	  *
+	  * @param value información general del webhook.
+	  * @param messageDTO mensaje recibido.
+	  * @return {@link ContactDto} asociado al mensaje, o {@code null}
+	  *         si no es posible identificarlo.
+	  */
+	private ContactDto findContactForMessage(
+	        ValueDto value,
+	        MessageDto messageDTO) {
+
+	    /*
+	     * Validamos que el webhook contenga contactos.
+	     */
+	    if (value == null
+	            || value.getContacts() == null
+	            || value.getContacts().isEmpty()) {
+
+	        return null;
+	    }
+
+	    /*
+	     * Identificadores enviados por WhatsApp en el mensaje.
+	     */
+	    String fromUserId = messageDTO.getFromUserId();
+	    String from = messageDTO.getFrom();
+
+	    /*
+	     * ---------------------------------------------------------
+	     * 1. Buscar por Meta User ID
+	     * ---------------------------------------------------------
+	     *
+	     * Es el identificador más preciso cuando está disponible.
+	     */
+	    if (fromUserId != null && !fromUserId.isBlank()) {
+
+	        for (ContactDto contact : value.getContacts()) {
+
+	            if (contact == null) {
+	                continue;
+	            }
+
+	            String userId = contact.getUserId();
+
+	            if (userId != null && userId.equals(fromUserId)) {
+	                return contact;
+	            }
+	        }
+	    }
+
+	    /*
+	     * ---------------------------------------------------------
+	     * 2. Buscar por WhatsApp ID
+	     * ---------------------------------------------------------
+	     *
+	     * En muchos mensajes el campo "from" corresponde
+	     * al identificador de WhatsApp del remitente.
+	     */
+	    if (from != null && !from.isBlank()) {
+
+	        for (ContactDto contact : value.getContacts()) {
+
+	            if (contact == null) {
+	                continue;
+	            }
+
+	            String waId = contact.getWaId();
+
+	            if (waId != null && waId.equals(from)) {
+	                return contact;
+	            }
+	        }
+	    }
+
+	    /*
+	     * ---------------------------------------------------------
+	     * 3. Fallback
+	     * ---------------------------------------------------------
+	     *
+	     * Si Meta solamente proporciona un contacto y no fue posible
+	     * realizar la asociación mediante IDs, utilizamos ese contacto.
+	     *
+	     * Esto permite continuar procesando mensajes parciales.
+	     */
+	    if (value.getContacts().size() == 1) {
+	        return value.getContacts().getFirst();
+	    }
+
+	    /*
+	     * No fue posible determinar qué contacto corresponde
+	     * al mensaje.
+	     */
+	    return null;
+	}
+	
+	private void processBusinessFlow(
+	        Contact contact,
+	        MessageDto messageDTO) {
+
+	    if (contact == null) {
+	        return;
+	    }
+
+	    switch (contact.getRegistrationStep()) {
+
+	        case GREETING -> {
+	
+	            contact.setRegistrationStep(
+	                    RegistrationStep.EMAILANDCOMPANY
+	            );
+	
+	            this.contactRepository.save(contact);
+	            
+	            this.notificationService.sendNotification(contact);
+	            this.notificationService.sendNewContact(contact);
+	
+	            this.whatsappResponseAutimatics.sendText(
+	                    contact.getPhone(),
+	                    " Bienvenido a Neumática Industrial S.A.S.\n"
+	                    .concat("Especialistas en automatización, neumática y aire comprimido.\n")
+	                    .concat("Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n")
+	                    .concat(". Correo electrónico (en minúscula)\n")
+	                    .concat(". Nombre de la empresa (sin caracteres especiales)\n")
+	            );
+	        }
+	
+	        case EMAILANDCOMPANY -> {
+	        	
+	        	this.notificationService.sendNotification(contact);
+	            this.notificationService.sendNewContact(contact);
+	            
+	        	processEmailAndCompany(contact, messageDTO);
+	        }
+	        
+	        case COMPLETED -> {
+	        	
+	        	this.notificationService.sendNotification(contact);
+	            this.notificationService.sendNewContact(contact);
+	            
+	        	this.whatsappResponseAutimatics.sendText(contact.getPhone(),	        
+	        		"Hola ".concat(contact.getName()).concat("\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."));
+	        }
+	    }
+	}
+	
+	private Contact getOrCreateContact(
+	        ContactDto dto,
+	        MessageDto messageDTO) {
+
+	    /*
+	     * Intentamos identificar al contacto
+	     * mediante la información disponible.
+	     */
+
+	    if (dto != null &&
+	        dto.getWaId() != null &&
+	        !dto.getWaId().isBlank()) {
+
+	        return contactRepository
+	            .findByPhone(dto.getWaId())
+	            .orElseGet(() ->
+	                createContact(dto)
+	            );
+	    }
+
+	    if (dto != null &&
+	        dto.getUserId() != null &&
+	        !dto.getUserId().isBlank()) {
+
+	        return contactRepository
+	            .findByMetaUserId(dto.getUserId())
+	            .orElseGet(() ->
+	                createContact(dto)
+	            );
+	    }
+
+	    /*
+	     * No tenemos identificadores suficientes.
+	     *
+	     * Aun así creamos un contacto parcial.
+	     */
+	    return createContact(dto);
+	}
+	
+	/*
+	 * Crea un nuevo contacto a partir de la información
+	 * disponible en el webhook de WhatsApp.
+	 *
+	 * <p>Los datos del contacto pueden ser parciales, ya que
+	 * WhatsApp no siempre proporciona todos los identificadores
+	 * o información del perfil.
+	 *
+	 * @param contactDto información recibida desde WhatsApp.
+	 * @return contacto persistido en la base de datos.
+	 */
+	private Contact createContact(ContactDto contactDto) {
+
+	    String phone = contactDto.getWaId();
+	    String metaUserId = contactDto.getUserId();
+
+	    /*
+	     * El perfil puede no venir en determinados eventos.
+	     * Por eso nunca debemos hacer directamente:
+	     *
+	     * contactDto.getProfile().getName()
+	     *
+	     * porque podría producir un NullPointerException.
+	     */
+	    String name = null;
+
+	    if (contactDto.getProfile() != null) {
+	        name = contactDto.getProfile().getName();
+	    }
+
+	    LocalDateTime now = LocalDateTime.now();
+
+	    Contact contact = Contact.builder()
+	            .phone(phone)
+	            .metaUserId(metaUserId)
+	            .name(name)
+	            .firstContact(now)
+	            .lastInteraction(now)
+	            .createdAt(now)
+	            .build();
+
+	    return contactRepository.save(contact);
+	}
+	
+	/*@Transactional
 	@Override
 	public void processWebhook(WhatsappWebHookDto webhook) {
 		
@@ -184,7 +634,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	        		"Hola ".concat(contact.getName()).concat("\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."));
 	        }
 	    }
-    }
+    }*/
 
     private Contact getOrCreateContact(ContactDto dto) {
 
@@ -240,7 +690,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
             return;
         }
 
-        Message message = this.messageMapper.toEntity(dto, conversation);
+        Message message = this.messageMapper.toEntity(dto);
 
         conversation.addMessage(message);
         

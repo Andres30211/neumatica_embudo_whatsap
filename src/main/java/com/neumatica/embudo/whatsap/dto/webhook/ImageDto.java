@@ -16,7 +16,7 @@ public class ImageDto {
 
     private String sha256;
 
-    /**
+    /*
      * Normalmente este campo NO viene en el webhook.
      * Para obtener la URL debes consultar la Graph API usando el id.
      */

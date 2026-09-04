@@ -23,4 +23,6 @@ public interface ContactRepository extends JpaRepository<Contact, UUID>{
 	List<Contact> findAllEmails();
 
 	Optional<Contact> findByPhone(String phone);
+	
+	Optional<Contact> findByMetaUserId(String metaUserId);
 }

@@ -15,7 +15,7 @@ public class ValueDto {
 	
 	private MetadataDto metadata;
 
-    private List<ContactDto> contacts;
+    private List<ContactDto> contacts = new ArrayList<>();
 
     private List<MessageDto> messages = new ArrayList<>();
     

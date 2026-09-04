@@ -1,6 +1,7 @@
 package com.neumatica.embudo.whatsap.repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,4 +16,6 @@ public interface MessageRepository extends JpaRepository<Message, UUID>{
 	List<Message> findByConversation(Conversation conversation);
 
 	boolean existsByWhatsappMessageId(String whatsappMessageId);
+	
+	Optional<Message> findByWhatsappMessageId(String id);
 }
