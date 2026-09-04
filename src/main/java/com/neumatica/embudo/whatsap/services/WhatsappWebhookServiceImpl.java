@@ -42,6 +42,8 @@ import jakarta.transaction.Transactional;
 
 @Service
 public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
+
+    private final MediaStorageServiceImpl mediaStorageServiceImpl;
 	
 	@Autowired
 	private ContactRepository contactRepository;
@@ -69,6 +71,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	@Autowired
 	private MessageProcessingService messageProcessingService;
+
+    WhatsappWebhookServiceImpl(MediaStorageServiceImpl mediaStorageServiceImpl) {
+        this.mediaStorageServiceImpl = mediaStorageServiceImpl;
+    }
 	
 	@Override
 	//@Transactional(readOnly = true)
@@ -782,9 +788,65 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		});
     }
 
-	@Override
-	public void delete(UUID id) {
-		this.contactRepository.deleteById(id);
-		
-	}
+    @Override
+    @Transactional
+    public void delete(UUID id) {
+
+        /*
+         * Buscamos el contacto junto con sus conversaciones y mensajes
+         * para poder identificar los archivos multimedia asociados.
+         */
+        Contact contact =
+                this.contactRepository
+                        .findById(id)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Contacto no encontrado."
+                                )
+                        );
+
+        /*
+         * Recorremos todas las conversaciones del contacto.
+         */
+        if (contact.getConversations() != null) {
+
+            contact.getConversations()
+                    .forEach(conversation -> {
+
+                        /*
+                         * Recorremos todos los mensajes de la conversación.
+                         */
+                        if (conversation.getMessages() != null) {
+
+                            conversation.getMessages()
+                                    .forEach(message -> {
+
+                                        /*
+                                         * Si el mensaje tiene un archivo
+                                         * multimedia almacenado, lo eliminamos
+                                         * físicamente del servidor.
+                                         */
+                                        if (message.getStoragePath() != null
+                                                && !message.getStoragePath().isBlank()) {
+
+                                            this.mediaStorageServiceImpl
+                                                    .delete(
+                                                            message.getStoragePath()
+                                                    );
+                                        }
+                                    });
+                        }
+                    });
+        }
+
+        /*
+         * Finalmente eliminamos el contacto.
+         *
+         * Debido al cascade configurado en Contact -> Conversation
+         * y Conversation -> Message, las conversaciones y mensajes
+         * asociados también serán eliminados de la base de datos.
+         */
+        this.contactRepository.delete(contact);
+    }
+
 }

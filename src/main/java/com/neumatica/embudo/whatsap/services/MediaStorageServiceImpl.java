@@ -643,4 +643,88 @@ public class MediaStorageServiceImpl
             Long fileSize
     ) {
     }
+    
+    
+    public void delete(String storagePath) {
+
+        if (storagePath == null
+                || storagePath.isBlank()) {
+
+            return;
+        }
+
+        /*
+         * Convertimos la ruta lógica almacenada en la BD
+         * a una ruta física dentro de nuestro directorio multimedia.
+         *
+         * Ejemplo:
+         *
+         * BD:
+         * whatsapp/2026/09/abc.jpg
+         *
+         * Archivo:
+         * ./uploads/whatsapp/2026/09/abc.jpg
+         */
+        String relativePath =
+                storagePath.replaceFirst(
+                        "^whatsapp/",
+                        ""
+                );
+
+        Path filePath =
+                Paths.get("./uploads/whatsapp")
+                        .toAbsolutePath()
+                        .normalize()
+                        .resolve(relativePath)
+                        .normalize();
+
+        /*
+         * Protección contra Path Traversal.
+         *
+         * Evita que una ruta maliciosa pueda intentar eliminar
+         * archivos fuera del directorio permitido.
+         */
+        Path mediaRoot =
+                Paths.get("./uploads/whatsapp")
+                        .toAbsolutePath()
+                        .normalize();
+
+        if (!filePath.startsWith(mediaRoot)) {
+
+            throw new IllegalArgumentException(
+                    "La ruta multimedia no pertenece al directorio permitido: "
+                            + storagePath
+            );
+        }
+
+        try {
+
+            boolean deleted =
+                    Files.deleteIfExists(filePath);
+
+            if (deleted) {
+
+                log.info(
+                        "Archivo multimedia eliminado correctamente: {}",
+                        filePath
+                );
+
+            } else {
+
+                log.warn(
+                        "El archivo multimedia no existe: {}",
+                        filePath
+                );
+            }
+
+        } catch (IOException exception) {
+
+            throw new IllegalStateException(
+                    "No fue posible eliminar el archivo multimedia: "
+                            + filePath,
+                    exception
+            );
+        }
+    }
+
 }
