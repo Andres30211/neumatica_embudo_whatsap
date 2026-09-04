@@ -785,44 +785,94 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     }
 
-    public void processEmailAndCompany(Contact contact, MessageDto messageDTO){
-    	
-    	Pattern pattern = Pattern.compile(
-    		    "^\\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})\\s*\\r?\\n\\s*(.+?)\\s*$",
-    		    Pattern.MULTILINE
-    		);
+    public void processEmailAndCompany(
+            Contact contact,
+            MessageDto messageDTO) {
 
-    		Matcher matcher = pattern.matcher(messageDTO.getText().getBody());
+        if (contact == null || messageDTO == null) {
+            return;
+        }
 
-    		if (matcher.find()) {
-    		    String email = matcher.group(1);
-    		    String company = matcher.group(2);
+        /*
+         * Esta etapa del flujo espera que el contacto envíe:
+         *
+         * correo electrónico
+         * nombre de la empresa
+         *
+         * Por lo tanto, solamente debemos procesar mensajes de tipo TEXT.
+         */
+        if (!"text".equalsIgnoreCase(messageDTO.getType())) {
+            return;
+        }
 
-    		    contact.setEmail(email);
-    		    contact.setCompany(company);
-    		    
-    		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
-    		    
-    		    sendAutomaticMessage(contact, contact.getName()
-		    		.concat("  ¡Gracias!\n")
-		    		.concat("Hemos recibido tu información correctamente.")
-		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
-		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
-    		    
-    		    EmailRequestDto emailRequestDto = new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany());
-    		    try {
-					this.brevoEmailServices.sendEmail(emailRequestDto, 4L);
-				} catch (Exception e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-    		    
-    		    contactRepository.save(contact);
-    			
-    			this.notificationService.sendNewContact(contact);
-    			
-    			
-    		}
+        if (messageDTO.getText() == null
+                || messageDTO.getText().getBody() == null
+                || messageDTO.getText().getBody().isBlank()) {
+            return;
+        }
+
+        Pattern pattern = Pattern.compile(
+                "^\\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})\\s*\\r?\\n\\s*(.+?)\\s*$",
+                Pattern.MULTILINE
+        );
+
+        Matcher matcher =
+                pattern.matcher(
+                        messageDTO.getText().getBody()
+                );
+
+        if (matcher.find()) {
+
+            String email = matcher.group(1);
+            String company = matcher.group(2);
+
+            contact.setEmail(email);
+            contact.setCompany(company);
+            contact.setRegistrationStep(
+                    RegistrationStep.COMPLETED
+            );
+
+            sendAutomaticMessage(
+                    contact,
+                    contact.getName()
+                            .concat("  ¡Gracias!\n")
+                            .concat(
+                                    "Hemos recibido tu información correctamente."
+                            )
+                            .concat(
+                                    "En este momento estamos asignando un asesor especializado, "
+                                    + "quien se pondrá en contacto contigo lo antes posible.\n"
+                            )
+                            .concat(
+                                    "Agradecemos la confianza depositada en Neumática Industrial. "
+                                    + "Estamos comprometidos con brindarte soluciones que impulsen "
+                                    + "la productividad y eficiencia de tu empresa."
+                            )
+            );
+
+            EmailRequestDto emailRequestDto =
+                    new EmailRequestDto(
+                            contact.getEmail(),
+                            contact.getName(),
+                            contact.getCompany()
+                    );
+
+            try {
+
+                this.brevoEmailServices.sendEmail(
+                        emailRequestDto,
+                        4L
+                );
+
+            } catch (Exception e) {
+
+                e.printStackTrace();
+            }
+
+            contactRepository.save(contact);
+
+            this.notificationService.sendNewContact(contact);
+        }
     }
     
     
