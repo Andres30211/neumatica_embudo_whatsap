@@ -9,7 +9,7 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
-import java.util.HexFormat;
+import java.util.Base64;
 import java.util.UUID;
 
 import org.springframework.http.HttpHeaders;
@@ -20,38 +20,24 @@ import org.springframework.web.client.RestClient;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.neumatica.embudo.whatsap.repository.MediaStorageService;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/*
- * Implementación del servicio encargado de descargar
- * y almacenar archivos multimedia provenientes de Meta.
- *
- * <p>El proceso realizado por esta clase es:
- *
- * <ol>
- *     <li>Recibir el mediaId de WhatsApp.</li>
- *     <li>Consultar Meta para obtener la URL temporal.</li>
- *     <li>Descargar el archivo desde dicha URL.</li>
- *     <li>Validar opcionalmente su SHA-256.</li>
- *     <li>Almacenar el archivo físicamente.</li>
- *     <li>Retornar una ruta lógica para almacenarla en BD.</li>
- * </ol>
- */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class MediaStorageServiceImpl
         implements MediaStorageService {
 
     /*
-     * Cliente HTTP utilizado para comunicarse con Meta.
+     * Cliente HTTP utilizado para comunicarnos con la API Graph de Meta.
      */
     private final RestClient restClient = RestClient.create();
 
+
     /*
-     * Descarga y almacena un archivo multimedia.
+     * Versión de la API Graph utilizada actualmente.
      */
+    private static final String GRAPH_API_VERSION = "v25.0";
+
     @Override
     public String downloadAndStore(
             String mediaId,
@@ -59,8 +45,10 @@ public class MediaStorageServiceImpl
             String sha256) {
 
         /*
-         * Validamos que exista el identificador
-         * del recurso multimedia.
+         * Validamos que Meta nos haya enviado un mediaId.
+         *
+         * Sin este identificador no podemos consultar la información
+         * del archivo multimedia en la API de Meta.
          */
         if (mediaId == null || mediaId.isBlank()) {
 
@@ -70,51 +58,70 @@ public class MediaStorageServiceImpl
         }
 
         /*
-         * Primero consultamos a Meta para obtener
-         * la URL temporal de descarga.
+         * Consultamos a Meta para obtener la URL temporal
+         * desde la cual podemos descargar el archivo.
          */
         MediaMetadata metadata =
                 getMediaMetadata(mediaId);
 
+        /*
+         * Validamos que Meta haya devuelto correctamente
+         * la URL temporal del archivo.
+         */
         if (metadata == null
                 || metadata.url() == null
                 || metadata.url().isBlank()) {
 
             throw new IllegalStateException(
                     "Meta no proporcionó una URL para el mediaId: "
-                    + mediaId
+                            + mediaId
             );
         }
 
         /*
-         * Determinamos la extensión a partir del MIME.
+         * Determinamos la extensión del archivo utilizando
+         * el MIME type recibido desde WhatsApp.
+         *
+         * Ejemplo:
+         *
+         * image/jpeg -> .jpg
+         * image/png  -> .png
+         * video/mp4  -> .mp4
          */
         String extension =
                 resolveExtension(mimeType);
 
         /*
-         * Generamos un nombre completamente interno.
+         * Generamos un nombre único para evitar colisiones
+         * entre archivos.
          *
-         * No utilizamos directamente el nombre enviado
-         * por el usuario para evitar problemas de seguridad.
+         * Ejemplo:
+         *
+         * 550e8400-e29b-41d4-a716-446655440000.jpg
          */
         String generatedFileName =
                 UUID.randomUUID() + extension;
 
         /*
-         * Creamos el directorio de almacenamiento.
+         * Creamos el directorio físico donde almacenaremos
+         * el archivo.
+         *
+         * Ejemplo:
+         *
+         * ./uploads/whatsapp/2026/09/
          */
         Path directory =
                 createStorageDirectory();
 
         /*
-         * Ruta física final.
+         * Construimos la ruta física completa del archivo.
          */
         Path targetFile =
                 directory.resolve(generatedFileName);
 
         /*
-         * Descargamos el archivo desde Meta.
+         * Descargamos el archivo desde la URL temporal
+         * proporcionada por Meta.
          */
         downloadFile(
                 metadata.url(),
@@ -122,23 +129,45 @@ public class MediaStorageServiceImpl
         );
 
         /*
-         * Si WhatsApp proporcionó SHA-256,
-         * verificamos que el archivo descargado
-         * coincida con el hash esperado.
+         * Determinamos cuál SHA-256 debemos utilizar
+         * para validar el archivo.
+         *
+         * Primero intentamos utilizar el SHA-256 recibido
+         * directamente en el webhook.
+         *
+         * Si no existe, utilizamos el SHA-256 obtenido
+         * desde la consulta de metadata a Meta.
          */
-        if (sha256 != null && !sha256.isBlank()) {
+        String expectedSha256 = sha256;
+
+        if (expectedSha256 == null
+                || expectedSha256.isBlank()) {
+
+            expectedSha256 =
+                    metadata.sha256();
+        }
+
+        /*
+         * Si tenemos SHA-256 disponible, validamos que el
+         * archivo descargado sea exactamente el archivo
+         * que Meta nos indicó.
+         */
+        if (expectedSha256 != null
+                && !expectedSha256.isBlank()) {
 
             validateSha256(
                     targetFile,
-                    sha256
+                    expectedSha256
             );
         }
 
         /*
-         * Generamos una ruta lógica.
+         * Construimos la ruta lógica que será almacenada
+         * posteriormente en la base de datos.
          *
-         * Esta es la que posteriormente almacenaremos
-         * en la base de datos.
+         * Ejemplo:
+         *
+         * whatsapp/2026/09/550e8400-e29b-41d4-a716-446655440000.jpg
          */
         String storagePath =
                 buildStoragePath(
@@ -151,53 +180,88 @@ public class MediaStorageServiceImpl
                 storagePath
         );
 
+        /*
+         * Retornamos únicamente la ruta lógica.
+         *
+         * El archivo físico permanece en:
+         *
+         * ./uploads/whatsapp/...
+         *
+         * Y en la base de datos se guarda:
+         *
+         * whatsapp/2026/09/archivo.jpg
+         */
         return storagePath;
     }
 
     /*
-     * Consulta a Meta para obtener los metadatos
-     * y la URL temporal del archivo multimedia.
+     * Consulta a Meta la información asociada al mediaId.
+     *
+     * Meta devuelve información como:
+     *
+     * - URL temporal de descarga
+     * - MIME type
+     * - SHA-256
+     * - Tamaño del archivo
      */
     private MediaMetadata getMediaMetadata(
             String mediaId) {
 
-        String url = String.format(
-                "https://graph.facebook.com/%s/%s",
-                "v25.0/",
-                mediaId
-        );
+        /*
+         * Construimos la URL de la API Graph.
+         *
+         * Ejemplo:
+         *
+         * https://graph.facebook.com/v25.0/2113718569351118
+         */
+        String url =
+                String.format(
+                        "https://graph.facebook.com/%s/%s",
+                        GRAPH_API_VERSION,
+                        mediaId
+                );
 
+        /*
+         * Realizamos la petición GET a Meta.
+         */
         return restClient.get()
                 .uri(url)
                 .header(
                         HttpHeaders.AUTHORIZATION,
-                        "Bearer "
-                                + "EAAWNon6bi60BSBJQsDz4UFjXGJGEq39Uuxo9fcgNj4QkDpm3WfrPdiZCUZBdGOzNU3u8A1tplKSXfGTlS8KC6NmARGiljZCKnQjTGw8ffJi89KosBh77yAKxZAI0qhWrOkZB2QIpnqyovQe5gchBEI0dX5M7pduHdIrITgOrpUxgMZCwRBiXGaPh7nOA9SHQZDZD"
+                        "Bearer " + "EAAWNon6bi60BSBJQsDz4UFjXGJGEq39Uuxo9fcgNj4QkDpm3WfrPdiZCUZBdGOzNU3u8A1tplKSXfGTlS8KC6NmARGiljZCKnQjTGw8ffJi89KosBh77yAKxZAI0qhWrOkZB2QIpnqyovQe5gchBEI0dX5M7pduHdIrITgOrpUxgMZCwRBiXGaPh7nOA9SHQZDZD"
                 )
                 .retrieve()
                 .body(MediaMetadata.class);
     }
 
     /*
-     * Descarga físicamente el archivo desde la URL
-     * temporal proporcionada por Meta.
+     * Descarga físicamente el archivo multimedia desde
+     * la URL temporal proporcionada por Meta.
      */
     private void downloadFile(
             String downloadUrl,
             Path targetFile) {
 
+        /*
+         * Realizamos la petición GET hacia la URL temporal.
+         *
+         * La URL temporal también requiere el Access Token.
+         */
         restClient.get()
                 .uri(downloadUrl)
                 .header(
                         HttpHeaders.AUTHORIZATION,
-                        "Bearer "
-                                + "EAAWNon6bi60BSBJQsDz4UFjXGJGEq39Uuxo9fcgNj4QkDpm3WfrPdiZCUZBdGOzNU3u8A1tplKSXfGTlS8KC6NmARGiljZCKnQjTGw8ffJi89KosBh77yAKxZAI0qhWrOkZB2QIpnqyovQe5gchBEI0dX5M7pduHdIrITgOrpUxgMZCwRBiXGaPh7nOA9SHQZDZD"
+                        "Bearer " + "EAAWNon6bi60BSBJQsDz4UFjXGJGEq39Uuxo9fcgNj4QkDpm3WfrPdiZCUZBdGOzNU3u8A1tplKSXfGTlS8KC6NmARGiljZCKnQjTGw8ffJi89KosBh77yAKxZAI0qhWrOkZB2QIpnqyovQe5gchBEI0dX5M7pduHdIrITgOrpUxgMZCwRBiXGaPh7nOA9SHQZDZD"
                 )
                 .exchange((request, response) -> {
 
                     HttpStatusCode status =
                             response.getStatusCode();
 
+                    /*
+                     * Verificamos que Meta haya respondido
+                     * correctamente.
+                     */
                     if (!status.is2xxSuccessful()) {
 
                         throw new IllegalStateException(
@@ -206,9 +270,16 @@ public class MediaStorageServiceImpl
                         );
                     }
 
+                    /*
+                     * Obtenemos el stream del archivo.
+                     */
                     try (InputStream inputStream =
                                  response.getBody()) {
 
+                        /*
+                         * Validamos que realmente exista
+                         * contenido en la respuesta.
+                         */
                         if (inputStream == null) {
 
                             throw new IllegalStateException(
@@ -216,6 +287,14 @@ public class MediaStorageServiceImpl
                             );
                         }
 
+                        /*
+                         * Copiamos el stream directamente al archivo.
+                         *
+                         * No cargamos todo el archivo en memoria.
+                         *
+                         * Esto es importante para archivos grandes
+                         * como videos.
+                         */
                         Files.copy(
                                 inputStream,
                                 targetFile,
@@ -235,22 +314,28 @@ public class MediaStorageServiceImpl
     }
 
     /*
-     * Crea la estructura de directorios donde
-     * serán almacenados los archivos.
+     * Crea el directorio donde se almacenarán los archivos.
      *
-     * <p>Ejemplo:
+     * Estructura:
      *
-     * uploads/whatsapp/2026/09/
+     * ./uploads/whatsapp/
+     *     └── 2026/
+     *         └── 09/
      */
     private Path createStorageDirectory() {
 
         LocalDate now =
                 LocalDate.now();
 
+        /*
+         * Construimos la estructura de directorios.
+         */
         Path directory =
                 Paths.get(
                         "./uploads/whatsapp",
-                        String.valueOf(now.getYear()),
+                        String.valueOf(
+                                now.getYear()
+                        ),
                         String.format(
                                 "%02d",
                                 now.getMonthValue()
@@ -259,6 +344,10 @@ public class MediaStorageServiceImpl
 
         try {
 
+            /*
+             * Crea todos los directorios necesarios
+             * si todavía no existen.
+             */
             Files.createDirectories(
                     directory
             );
@@ -276,8 +365,11 @@ public class MediaStorageServiceImpl
     }
 
     /*
-     * Construye la ruta lógica que será almacenada
-     * en la base de datos.
+     * Construye la ruta lógica que será almacenada en la BD.
+     *
+     * Ejemplo:
+     *
+     * whatsapp/2026/09/archivo.jpg
      */
     private String buildStoragePath(
             String fileName) {
@@ -294,61 +386,104 @@ public class MediaStorageServiceImpl
     }
 
     /*
-     * Determina una extensión segura utilizando
-     * el tipo MIME recibido.
+     * Determina la extensión del archivo a partir del MIME type.
      */
     private String resolveExtension(
             String mimeType) {
 
+        /*
+         * Si Meta no proporciona MIME type,
+         * utilizamos una extensión genérica.
+         */
         if (mimeType == null
                 || mimeType.isBlank()) {
 
             return ".bin";
         }
 
+        /*
+         * Normalizamos el MIME type para evitar problemas
+         * con mayúsculas/minúsculas.
+         */
         return switch (
                 mimeType.toLowerCase()
         ) {
 
-            case "image/jpeg" -> ".jpg";
-            case "image/png" -> ".png";
-            case "image/webp" -> ".webp";
-            case "image/gif" -> ".gif";
+            case "image/jpeg" ->
+                    ".jpg";
 
-            case "video/mp4" -> ".mp4";
-            case "video/3gpp" -> ".3gp";
+            case "image/png" ->
+                    ".png";
 
-            case "audio/ogg" -> ".ogg";
-            case "audio/mpeg" -> ".mp3";
-            case "audio/mp4" -> ".m4a";
-            case "audio/aac" -> ".aac";
+            case "image/webp" ->
+                    ".webp";
 
-            case "application/pdf" -> ".pdf";
+            case "image/gif" ->
+                    ".gif";
 
-            case "application/msword" -> ".doc";
+            case "video/mp4" ->
+                    ".mp4";
 
-            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    -> ".docx";
+            case "video/3gpp" ->
+                    ".3gp";
 
-            case "application/vnd.ms-excel"
-                    -> ".xls";
+            case "audio/ogg" ->
+                    ".ogg";
 
-            case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    -> ".xlsx";
+            case "audio/mpeg" ->
+                    ".mp3";
 
-            case "application/vnd.ms-powerpoint"
-                    -> ".ppt";
+            case "audio/mp4" ->
+                    ".m4a";
 
-            case "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    -> ".pptx";
+            case "audio/aac" ->
+                    ".aac";
 
-            default -> ".bin";
+            case "application/pdf" ->
+                    ".pdf";
+
+            case "application/msword" ->
+                    ".doc";
+
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ->
+                    ".docx";
+
+            case "application/vnd.ms-excel" ->
+                    ".xls";
+
+            case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ->
+                    ".xlsx";
+
+            case "application/vnd.ms-powerpoint" ->
+                    ".ppt";
+
+            case "application/vnd.openxmlformats-officedocument.presentationml.presentation" ->
+                    ".pptx";
+
+            /*
+             * Si aparece un MIME type que todavía no
+             * contemplamos, almacenamos el archivo como .bin.
+             */
+            default ->
+                    ".bin";
         };
     }
 
     /*
-     * Calcula el SHA-256 del archivo descargado y
-     * lo compara con el hash proporcionado por WhatsApp.
+     * Valida el SHA-256 del archivo descargado.
+     *
+     * IMPORTANTE:
+     *
+     * Meta entrega el SHA-256 en Base64.
+     *
+     * Por ejemplo:
+     *
+     * cQRyKQn65TMCvuVBbARxxKlXBYRrv0k2Dunzr6hnWCU=
+     *
+     * Por lo tanto NO debemos utilizar HexFormat.
+     *
+     * Debemos calcular el SHA-256 como bytes y posteriormente
+     * convertir esos bytes a Base64.
      */
     private void validateSha256(
             Path file,
@@ -356,20 +491,41 @@ public class MediaStorageServiceImpl
 
         try {
 
+            /*
+             * Creamos el algoritmo SHA-256.
+             */
             MessageDigest digest =
-                    MessageDigest.getInstance("SHA-256");
+                    MessageDigest.getInstance(
+                            "SHA-256"
+                    );
 
+            /*
+             * Abrimos el archivo como stream.
+             *
+             * Esto permite calcular el hash sin cargar
+             * todo el archivo en memoria.
+             */
             try (InputStream inputStream =
                          Files.newInputStream(file)) {
 
+                /*
+                 * Buffer utilizado para leer el archivo
+                 * por bloques.
+                 */
                 byte[] buffer =
                         new byte[8192];
 
                 int bytesRead;
 
+                /*
+                 * Leemos el archivo completo.
+                 */
                 while ((bytesRead =
                         inputStream.read(buffer)) != -1) {
 
+                    /*
+                     * Alimentamos el contenido al algoritmo SHA-256.
+                     */
                     digest.update(
                             buffer,
                             0,
@@ -378,18 +534,49 @@ public class MediaStorageServiceImpl
                 }
             }
 
+            /*
+             * Obtenemos los bytes resultantes del SHA-256.
+             */
+            byte[] hashBytes =
+                    digest.digest();
+
+            /*
+             * Convertimos los bytes del SHA-256 a Base64.
+             *
+             * Esto es lo importante para solucionar
+             * el error que estabas recibiendo.
+             */
             String calculatedSha256 =
-                    HexFormat.of()
-                            .formatHex(
-                                    digest.digest()
+                    Base64.getEncoder()
+                            .encodeToString(
+                                    hashBytes
                             );
 
-            if (!calculatedSha256.equalsIgnoreCase(
+            /*
+             * Dejamos esta información en DEBUG.
+             *
+             * No usamos INFO porque el SHA-256 no es necesario
+             * mostrarlo normalmente en producción.
+             */
+            log.debug(
+                    "Validación SHA-256. esperado={}, calculado={}",
+                    expectedSha256,
+                    calculatedSha256
+            );
+
+            /*
+             * Comparamos el hash calculado con el proporcionado
+             * por Meta.
+             */
+            if (!calculatedSha256.equals(
                     expectedSha256)) {
 
                 /*
-                 * Si el archivo no coincide con el hash,
-                 * eliminamos el archivo corrupto.
+                 * Si el archivo no coincide con el hash esperado,
+                 * eliminamos el archivo descargado.
+                 *
+                 * Así evitamos conservar un archivo potencialmente
+                 * corrupto o diferente al esperado.
                  */
                 Files.deleteIfExists(file);
 
@@ -410,8 +597,37 @@ public class MediaStorageServiceImpl
     }
 
     /*
-     * Representa la respuesta de Meta al consultar
-     * un recurso multimedia.
+     * Obtiene el Access Token desde la variable de entorno.
+     *
+     * De esta manera evitamos almacenar el token directamente
+     * dentro del código fuente.
+     */
+    /*private String getAccessToken() {
+
+        if (accessToken == null
+                || accessToken.isBlank()) {
+
+            throw new IllegalStateException(
+                    "No está configurada la variable de entorno "
+                            + "WHATSAPP_ACCESS_TOKEN."
+            );
+        }
+
+        return accessToken;
+    }*/
+
+    /*
+     * Representa la respuesta que devuelve Meta cuando
+     * consultamos un mediaId.
+     *
+     * Ejemplo de información:
+     *
+     * {
+     *     "url": "...",
+     *     "mime_type": "image/jpeg",
+     *     "sha256": "...",
+     *     "file_size": 123456
+     * }
      */
     private record MediaMetadata(
 
