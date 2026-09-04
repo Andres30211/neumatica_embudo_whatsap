@@ -420,6 +420,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	    return null;
 	}
 	
+	
 	private void processBusinessFlow(
 	        Contact contact,
 	        MessageDto messageDTO) {
@@ -428,47 +429,208 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	        return;
 	    }
 
+	    /*
+	     * Un contacto puede llegar desde Meta sin número telefónico.
+	     *
+	     * En ese caso:
+	     * - Conservamos el contacto.
+	     * - Conservamos el mensaje.
+	     * - No intentamos enviar una respuesta a WhatsApp.
+	     *
+	     * El resto del flujo podrá continuar cuando posteriormente
+	     * tengamos disponible un número telefónico.
+	     */
+	    boolean hasPhone =
+	            contact.getPhone() != null
+	                    && !contact.getPhone().isBlank();
+
+	    if (!hasPhone) {
+
+	        addNoPhoneObservation(messageDTO);
+
+	        return;
+	    }
+
+	    /*
+	     * Protección para contactos antiguos que puedan tener
+	     * registrationStep = NULL.
+	     */
+	    if (contact.getRegistrationStep() == null) {
+
+	        contact.setRegistrationStep(
+	                RegistrationStep.GREETING
+	        );
+
+	        this.contactRepository.save(contact);
+	    }
+
 	    switch (contact.getRegistrationStep()) {
 
 	        case GREETING -> {
-	
+
 	            contact.setRegistrationStep(
 	                    RegistrationStep.EMAILANDCOMPANY
 	            );
-	
+
 	            this.contactRepository.save(contact);
-	            
-	            this.notificationService.sendNotification(contact);
-	            this.notificationService.sendNewContact(contact);
-	
-	            this.whatsappResponseAutimatics.sendText(
-	                    contact.getPhone(),
-	                    " Bienvenido a Neumática Industrial S.A.S.\n"
-	                    .concat("Especialistas en automatización, neumática y aire comprimido.\n")
-	                    .concat("Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n")
-	                    .concat(". Correo electrónico (en minúscula)\n")
-	                    .concat(". Nombre de la empresa (sin caracteres especiales)\n")
+
+	            this.notificationService.sendNotification(
+	                    contact
+	            );
+
+	            this.notificationService.sendNewContact(
+	                    contact
+	            );
+
+	            /*
+	             * El mensaje pertenece al primer contacto.
+	             *
+	             * El método sendAutomaticMessage() se encargará
+	             * de determinar si estamos dentro o fuera del
+	             * horario de atención.
+	             */
+	            sendAutomaticMessage(
+	                    contact,
+
+	                    "Bienvenido a Neumática Industrial S.A.S.\n"
+	                    .concat(
+	                            "Especialistas en automatización, neumática y aire comprimido.\n"
+	                    )
+	                    .concat(
+	                            "Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n"
+	                    )
+	                    .concat(
+	                            ". Correo electrónico (en minúscula)\n"
+	                    )
+	                    .concat(
+	                            ". Nombre de la empresa (sin caracteres especiales)\n"
+	                    )
 	            );
 	        }
-	
+
 	        case EMAILANDCOMPANY -> {
-	        	
-	        	this.notificationService.sendNotification(contact);
-	            this.notificationService.sendNewContact(contact);
-	            
-	        	processEmailAndCompany(contact, messageDTO);
+
+	            this.notificationService.sendNotification(
+	                    contact
+	            );
+
+	            this.notificationService.sendNewContact(
+	                    contact
+	            );
+
+	            processEmailAndCompany(
+	                    contact,
+	                    messageDTO
+	            );
 	        }
-	        
+
 	        case COMPLETED -> {
-	        	
-	        	this.notificationService.sendNotification(contact);
-	            this.notificationService.sendNewContact(contact);
-	            
-	        	this.whatsappResponseAutimatics.sendText(contact.getPhone(),	        
-	        		"Hola ".concat(contact.getName()).concat("\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."));
+
+	            this.notificationService.sendNotification(
+	                    contact
+	            );
+
+	            this.notificationService.sendNewContact(
+	                    contact
+	            );
+
+	            sendAutomaticMessage(
+	                    contact,
+
+	                    "Hola "
+	                    .concat(contact.getName())
+	                    .concat(
+	                            "\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."
+	                    )
+	            );
 	        }
 	    }
 	}
+	
+	
+	private void addNoPhoneObservation(
+	        MessageDto messageDTO) {
+
+	    /*
+	     * Validamos que tengamos el ID del mensaje recibido
+	     * para poder localizarlo en la base de datos.
+	     */
+	    if (messageDTO == null
+	            || messageDTO.getId() == null
+	            || messageDTO.getId().isBlank()) {
+
+	        return;
+	    }
+
+	    /*
+	     * Buscamos el mensaje que acabamos de guardar.
+	     */
+	    Message message =
+	            this.messageRepository
+	                    .findByWhatsappMessageId(
+	                            messageDTO.getId()
+	                    )
+	                    .orElse(null);
+
+	    if (message == null) {
+	        return;
+	    }
+
+	    /*
+	     * Mensaje interno que queremos dejar registrado
+	     * para que posteriormente pueda ser visualizado
+	     * desde el CRM.
+	     */
+	    String observation =
+	            "[SISTEMA] Este contacto no tiene un número de teléfono "
+	            + "disponible. Actualmente no puede ser atendido mediante "
+	            + "respuesta automática de WhatsApp. El contacto y su mensaje "
+	            + "han sido conservados para futuras implementaciones de atención.";
+
+	    /*
+	     * Si el mensaje original es de texto, agregamos la observación
+	     * al contenido existente.
+	     */
+	    if (message.getBody() != null
+	            && !message.getBody().isBlank()) {
+
+	        message.setBody(
+	                message.getBody()
+	                        + "\n\n"
+	                        + observation
+	        );
+
+	    /*
+	     * Si es multimedia y tiene caption, agregamos la observación
+	     * al caption.
+	     */
+	    } else if (message.getCaption() != null
+	            && !message.getCaption().isBlank()) {
+
+	        message.setCaption(
+	                message.getCaption()
+	                        + "\n\n"
+	                        + observation
+	        );
+
+	    /*
+	     * Si es multimedia pero no tiene caption, utilizamos
+	     * el caption para almacenar la observación.
+	     */
+	    } else {
+
+	        message.setCaption(
+	                observation
+	        );
+	    }
+
+	    /*
+	     * Persistimos nuevamente el mensaje.
+	     */
+	    this.messageRepository.save(message);
+	}
+
+
 	
 	private Contact getOrCreateContact(
 	        ContactDto dto,
@@ -539,7 +701,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	        name = contactDto.getProfile().getName();
 	    }
 
-	    LocalDateTime now = LocalDateTime.now();
+	    LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Bogota"));
 
 	    Contact contact = Contact.builder()
 	            .phone(phone)
@@ -554,94 +716,6 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	    return contactRepository.save(contact);
 	}
 	
-	/*@Transactional
-	@Override
-	public void processWebhook(WhatsappWebHookDto webhook) {
-		
-		
-		
-		ValueDto value = webhook.getEntry()
-                .getFirst()
-                .getChanges()
-                .getFirst()
-                .getValue();
-		
-		// Ignorar estados de entrega, leído, enviado, etc.
-		if (!value.getStatuses().isEmpty()) {
-
-		    System.out.println("Webhook de estado recibido");
-
-		    value.getStatuses().forEach(status ->
-		        System.out.println(status.getStatus())
-		    );
-
-		    return;
-		}
-		
-		// No hay mensajes
-	    if (value.getMessages() == null || value.getMessages().isEmpty()) {
-	        System.out.println("Webhook recibido sin mensajes. Se ignora.");
-	        return;
-	    }
-	    
-	    MessageDto messageDTO = value.getMessages().getFirst();
-
-	    // No hay contactos
-	    if (value.getContacts() == null || value.getContacts().isEmpty()) {
-	        System.out.println("Webhook recibido sin contactos. Se ignora.");
-	        return;
-	    }
-
-        ContactDto contactDTO = value.getContacts().getFirst();
-
-        Contact contact = this.getOrCreateContact(contactDTO);
-
-        Conversation conversation = getOrCreateConversation(contact);
-        
-        saveMessage(conversation, messageDTO);
-        
-        
-        switch (contact.getRegistrationStep()) {
-
-	        case GREETING -> {
-	
-	            contact.setRegistrationStep(
-	                    RegistrationStep.EMAILANDCOMPANY
-	            );
-	
-	            this.contactRepository.save(contact);
-	            
-	            this.notificationService.sendNotification(contact);
-	            this.notificationService.sendNewContact(contact);
-	
-	            this.whatsappResponseAutimatics.sendText(
-	                    contact.getPhone(),
-	                    " Bienvenido a Neumática Industrial S.A.S.\n"
-	                    .concat("Especialistas en automatización, neumática y aire comprimido.\n")
-	                    .concat("Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n")
-	                    .concat(". Correo electrónico (en minúscula)\n")
-	                    .concat(". Nombre de la empresa (sin caracteres especiales)\n")
-	            );
-	        }
-	
-	        case EMAILANDCOMPANY -> {
-	        	
-	        	this.notificationService.sendNotification(contact);
-	            this.notificationService.sendNewContact(contact);
-	            
-	        	processEmailAndCompany(contact, messageDTO);
-	        }
-	        
-	        case COMPLETED -> {
-	        	
-	        	this.notificationService.sendNotification(contact);
-	            this.notificationService.sendNewContact(contact);
-	            
-	        	this.whatsappResponseAutimatics.sendText(contact.getPhone(),	        
-	        		"Hola ".concat(contact.getName()).concat("\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."));
-	        }
-	    }
-    }*/
 
     private Contact getOrCreateContact(ContactDto dto) {
 
@@ -650,7 +724,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
                     contact.setName(dto.getProfile().getName());
 
-                    contact.setLastInteraction(LocalDateTime.now());
+                    contact.setLastInteraction(LocalDateTime.now(ZoneId.of("America/Bogota")));
 
                     return this.contactRepository.save(contact);
 
@@ -680,8 +754,8 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
                             Conversation.builder()
                                     .contact(contact)
                                     .status(ConversationStatus.BOT)
-                                    .startedAt(LocalDateTime.now())
-                                    .lastMessageAt(LocalDateTime.now())
+                                    .startedAt(LocalDateTime.now(ZoneId.of("America/Bogota")))
+                                    .lastMessageAt(LocalDateTime.now(ZoneId.of("America/Bogota")))
                                     .build();
 
                     return this.conversationRepository.save(conversation);
@@ -703,7 +777,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         
         conversation.setLastMessageAt(
         	    Instant.ofEpochSecond(Long.parseLong(dto.getTimestamp()))
-        	           .atZone(ZoneId.systemDefault())
+        	           .atZone(ZoneId.of("America/Bogota"))
         	           .toLocalDateTime()
         	);
 
@@ -729,7 +803,11 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		    
     		    contact.setRegistrationStep(RegistrationStep.COMPLETED);
     		    
-    		    this.sendMessageByHour(contact);
+    		    sendAutomaticMessage(contact, contact.getName()
+		    		.concat("  ¡Gracias!\n")
+		    		.concat("Hemos recibido tu información correctamente.")
+		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
+		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
     		    
     		    EmailRequestDto emailRequestDto = new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany());
     		    try {
@@ -747,31 +825,90 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     		}
     }
     
-    public void sendMessageByHour(Contact contact) {
+    
+    private void sendAutomaticMessage(
+            Contact contact,
+            String message) {
 
-        LocalTime ahora = LocalTime.now(
-            ZoneId.of("America/Bogota")
-        );
-
-        LocalTime horaInicio = LocalTime.of(7, 0);
-        LocalTime horaFin = LocalTime.of(17, 0);
-
-        if (!ahora.isBefore(horaInicio) && ahora.isBefore(horaFin)) {
-        	this.whatsappResponseAutimatics.sendText(contact.getPhone(),
-		    		contact.getName()
-		    		.concat("  ¡Gracias!\n")
-		    		.concat("Hemos recibido tu información correctamente.")
-		    		.concat("En este momento estamos asignando un asesor especializado, quien se pondrá en contacto contigo lo antes posible.\n")
-		    		.concat("Agradecemos la confianza depositada en Neumática Industrial. Estamos comprometidos con brindarte soluciones que impulsen la productividad y eficiencia de tu empresa."));
-        	return;
+        if (contact == null) {
+            return;
         }
 
-        this.whatsappResponseAutimatics.sendText(contact.getPhone(),
-	    		contact.getName()
-	    		.concat(" Gracias por comunicarte con Neumática Industrial.\n")
-	    		.concat("En este momento nuestro equipo se encuentra fuera del horario de atención. Hemos recibido tu mensaje y uno de nuestros asesores te responderá a primera hora del siguiente día hábil.")
-	    		.concat("Agradecemos tu confianza."));
+        if (message == null || message.isBlank()) {
+            return;
+        }
+
+        /*
+         * Zona horaria oficial de la empresa.
+         *
+         * Esto evita depender de la zona horaria configurada
+         * en el servidor donde esté desplegado Spring Boot.
+         */
+        LocalTime currentTime =
+                LocalTime.now(
+                        ZoneId.of("America/Bogota")
+                );
+
+        /*
+         * Horario de atención:
+         *
+         * Lunes a viernes:
+         * 07:00 incluido
+         * 17:00 excluido
+         *
+         * Actualmente solamente estamos controlando la hora.
+         */
+        LocalTime startTime =
+                LocalTime.of(7, 0);
+
+        LocalTime endTime =
+                LocalTime.of(17, 0);
+
+        boolean withinBusinessHours =
+                !currentTime.isBefore(startTime)
+                        && currentTime.isBefore(endTime);
+
+        /*
+         * Dentro del horario:
+         *
+         * Enviamos directamente el mensaje correspondiente
+         * al flujo actual.
+         */
+        if (withinBusinessHours) {
+
+            this.whatsappResponseAutimatics.sendText(
+                    contact.getPhone(),
+                    message
+            );
+
+            return;
+        }
+
+        /*
+         * Fuera del horario:
+         *
+         * No enviamos el mensaje específico del flujo.
+         * En su lugar enviamos el mensaje general indicando
+         * que la empresa está fuera de horario.
+         */
+        String outOfHoursMessage =
+                "Gracias por comunicarte con Neumática Industrial.\n"
+                .concat(
+                        "En este momento nuestro equipo se encuentra fuera del horario de atención. "
+                )
+                .concat(
+                        "Hemos recibido tu mensaje y uno de nuestros asesores te responderá a primera hora del siguiente día hábil.\n"
+                )
+                .concat(
+                        "Agradecemos tu confianza."
+                );
+
+        this.whatsappResponseAutimatics.sendText(
+                contact.getPhone(),
+                outOfHoursMessage
+        );
     }
+
     
     @Async
     public void sendCampaing() {
