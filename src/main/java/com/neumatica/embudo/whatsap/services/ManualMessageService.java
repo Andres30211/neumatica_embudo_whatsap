@@ -67,12 +67,16 @@ public class ManualMessageService {
     public Message sendMessage(
             UUID conversationId,
             UUID userId,
-            String text
+            String text,
+            String accessToken
     ) {
 
         /*
-         * Validamos los parámetros.
+         * ============================================================
+         * 1. VALIDAMOS LOS PARÁMETROS
+         * ============================================================
          */
+
         if (conversationId == null) {
             throw new IllegalArgumentException(
                     "El conversationId es obligatorio."
@@ -91,11 +95,28 @@ public class ManualMessageService {
             );
         }
 
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalArgumentException(
+                    "El accessToken es obligatorio."
+            );
+        }
+
+
         /*
-         * Verificamos que el vendedor exista.
+         * ============================================================
+         * 2. VERIFICAMOS QUE EL VENDEDOR EXISTA
+         * ============================================================
+         *
+         * En este punto enviamos también el JWT al Security Service.
+         *
+         * El Security Service será el encargado de validar
+         * que el token sea válido y consultar al usuario.
          */
-        var user =
-                userClientService.findById(userId);
+
+        var user = userClientService.findById(
+                userId,
+                accessToken
+        );
 
         if (user == null) {
             throw new RuntimeException(
@@ -103,22 +124,33 @@ public class ManualMessageService {
             );
         }
 
+
         /*
-         * Buscamos la conversación.
+         * ============================================================
+         * 3. BUSCAMOS LA CONVERSACIÓN
+         * ============================================================
          */
+
         Conversation conversation =
                 conversationRepository
                         .findById(conversationId)
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                    "Conversación no encontrada."
+                                        "Conversación no encontrada."
                                 )
                         );
 
+
         /*
-         * El vendedor solamente puede enviar mensajes
-         * en una conversación HUMAN.
+         * ============================================================
+         * 4. VERIFICAMOS QUE ESTÉ EN ATENCIÓN HUMANA
+         * ============================================================
+         *
+         * El vendedor no puede enviar mensajes manuales si
+         * la conversación todavía está siendo atendida por el BOT
+         * o si ya fue cerrada.
          */
+
         if (conversation.getStatus()
                 != ConversationStatus.HUMAN) {
 
@@ -127,9 +159,16 @@ public class ManualMessageService {
             );
         }
 
+
         /*
-         * Verificamos que este vendedor sea el asignado.
+         * ============================================================
+         * 5. VERIFICAMOS QUE EL VENDEDOR SEA EL ASIGNADO
+         * ============================================================
+         *
+         * Esto evita que un vendedor pueda escribir en una
+         * conversación que pertenece a otro vendedor.
          */
+
         if (!userId.equals(
                 conversation.getAssignedUserId()
         )) {
@@ -139,9 +178,13 @@ public class ManualMessageService {
             );
         }
 
+
         /*
-         * Obtenemos el contacto.
+         * ============================================================
+         * 6. OBTENEMOS EL CONTACTO
+         * ============================================================
          */
+
         Contact contact =
                 conversation.getContact();
 
@@ -151,9 +194,13 @@ public class ManualMessageService {
             );
         }
 
+
         /*
-         * WhatsApp necesita un teléfono.
+         * ============================================================
+         * 7. VALIDAMOS EL TELÉFONO DE WHATSAPP
+         * ============================================================
          */
+
         if (contact.getPhone() == null
                 || contact.getPhone().isBlank()) {
 
@@ -162,21 +209,33 @@ public class ManualMessageService {
             );
         }
 
+
         /*
-         * Primero enviamos el mensaje a WhatsApp.
+         * ============================================================
+         * 8. ENVIAMOS EL MENSAJE A WHATSAPP
+         * ============================================================
          *
-         * Tu servicio actual ya posee:
+         * Utilizamos el servicio que ya tienes actualmente.
          *
-         * whatsappResponseAutimatics.sendText(...)
+         * IMPORTANTE:
+         *
+         * Tu método sendText() actualmente no devuelve el wamid
+         * generado por Meta, por eso por ahora guardamos null
+         * en whatsappMessageId.
          */
+
         whatsappResponseAutimatics.sendText(
                 contact.getPhone(),
                 text
         );
 
+
         /*
-         * Creamos el mensaje para el historial del CRM.
+         * ============================================================
+         * 9. CREAMOS EL MENSAJE PARA EL HISTORIAL
+         * ============================================================
          */
+
         LocalDateTime now =
                 LocalDateTime.now(ZONE_ID);
 
@@ -184,31 +243,45 @@ public class ManualMessageService {
                 Message.builder()
 
                         /*
-                         * Por ahora dejamos null porque
-                         * tu método sendText() actual no devuelve
-                         * el wamid generado por Meta.
+                         * Por ahora no tenemos el ID que devuelve
+                         * Meta/WhatsApp.
                          */
                         .whatsappMessageId(null)
 
+                        /*
+                         * Conversación a la que pertenece.
+                         */
                         .conversation(conversation)
 
-                        .direction(
-                                Direction.OUTGOING
-                        )
+                        /*
+                         * El mensaje sale desde nuestro CRM
+                         * hacia el cliente.
+                         */
+                        .direction(Direction.OUTGOING)
 
                         /*
-                         * Identificamos al vendedor.
+                         * Vendedor que envió el mensaje.
                          */
                         .senderUserId(userId)
 
-                        .type(
-                                MessageType.TEXT
-                        )
+                        /*
+                         * Tipo de mensaje.
+                         */
+                        .type(MessageType.TEXT)
 
+                        /*
+                         * Texto enviado.
+                         */
                         .body(text)
 
+                        /*
+                         * Fecha de creación.
+                         */
                         .createdAt(now)
 
+                        /*
+                         * Timestamp en formato Unix.
+                         */
                         .whatsappTimestamp(
                                 now.atZone(ZONE_ID)
                                         .toEpochSecond()
@@ -216,24 +289,44 @@ public class ManualMessageService {
 
                         .build();
 
+
         /*
-         * Agregamos el mensaje a la conversación.
+         * ============================================================
+         * 10. AGREGAMOS EL MENSAJE A LA CONVERSACIÓN
+         * ============================================================
          */
+
         conversation.addMessage(message);
 
-        /*
-         * Actualizamos la fecha del último mensaje.
-         */
-        conversation.setLastMessageAt(now);
 
         /*
-         * Guardamos la conversación.
-         *
-         * CascadeType.ALL también persistirá el mensaje.
+         * ============================================================
+         * 11. ACTUALIZAMOS EL ÚLTIMO MENSAJE
+         * ============================================================
          */
+
+        conversation.setLastMessageAt(now);
+
+
+        /*
+         * ============================================================
+         * 12. GUARDAMOS LA CONVERSACIÓN
+         * ============================================================
+         *
+         * Si Conversation tiene CascadeType.ALL sobre messages,
+         * el nuevo Message también será persistido.
+         */
+
         conversationRepository.save(
                 conversation
         );
+
+
+        /*
+         * ============================================================
+         * 13. DEVOLVEMOS EL MENSAJE
+         * ============================================================
+         */
 
         return message;
     }

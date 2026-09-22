@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import com.neumatica.embudo.whatsap.dto.user.UserResponseDto;
 import com.neumatica.embudo.whatsap.entitys.Conversation;
 import com.neumatica.embudo.whatsap.enums.ConversationStatus;
 import com.neumatica.embudo.whatsap.repository.ConversationRepository;
@@ -54,93 +55,64 @@ public class ConversationAttentionService {
     @Transactional
     public Conversation takeConversation(
             UUID conversationId,
-            UUID userId
+            UUID userId,
+            String accessToken
     ) {
 
-        if (conversationId == null) {
-            throw new IllegalArgumentException(
-                    "El conversationId es obligatorio."
-            );
-        }
-
-        if (userId == null) {
-            throw new IllegalArgumentException(
-                    "El userId es obligatorio."
-            );
-        }
-
-        /*
-         * Consultamos el usuario en Security Service.
-         *
-         * Esto evita asignar conversaciones a un usuario
-         * inexistente.
-         */
-        var user = userClientService.findById(userId);
+        UserResponseDto user =
+                userClientService.getUserById(
+                        userId,
+                        accessToken
+                );
 
         if (user == null) {
+
             throw new RuntimeException(
-                    "El usuario no existe."
+                    "El vendedor no existe."
             );
         }
 
         if (!user.isEnabled()) {
+
             throw new RuntimeException(
-                    "El usuario está deshabilitado."
+                    "El vendedor está deshabilitado."
             );
         }
 
         if (!user.isAccountNonLocked()) {
+
             throw new RuntimeException(
-                    "La cuenta del usuario está bloqueada."
+                    "El vendedor está bloqueado."
             );
         }
 
-        /*
-         * Buscamos la conversación.
-         */
         Conversation conversation =
                 conversationRepository
                         .findById(conversationId)
                         .orElseThrow(() ->
                                 new RuntimeException(
-                                    "Conversación no encontrada."
+                                        "Conversación no encontrada."
                                 )
                         );
 
-        /*
-         * Solamente permitimos tomar conversaciones
-         * que todavía estén siendo manejadas por el BOT.
-         */
         if (conversation.getStatus()
                 != ConversationStatus.BOT) {
 
             throw new RuntimeException(
-                    "La conversación ya no está disponible para atención."
+                    "La conversación no está disponible para atención."
             );
         }
 
-        /*
-         * Asignamos el vendedor.
-         */
         conversation.setAssignedUserId(userId);
 
-        /*
-         * Guardamos cuándo fue asignada.
-         */
         conversation.setAssignedAt(
-                LocalDateTime.now(ZONE_ID)
+                LocalDateTime.now()
         );
 
-        /*
-         * Cambiamos el control del BOT al vendedor.
-         */
         conversation.setStatus(
                 ConversationStatus.HUMAN
         );
 
-        /*
-         * Guardamos.
-         */
         return conversationRepository.save(
                 conversation
         );

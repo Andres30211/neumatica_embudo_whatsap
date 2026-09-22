@@ -18,15 +18,6 @@ import lombok.Setter;
 public class SendMessageRequest {
 
     /*
-     * UUID del vendedor que está enviando.
-     *
-     * Temporalmente viene desde Angular.
-     *
-     * Posteriormente lo obtendremos desde JWT.
-     */
-    private UUID userId;
-
-    /*
      * Texto que desea enviar el vendedor.
      */
     private String message;
