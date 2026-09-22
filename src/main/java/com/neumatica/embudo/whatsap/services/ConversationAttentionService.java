@@ -60,7 +60,7 @@ public class ConversationAttentionService {
     ) {
 
         UserResponseDto user =
-                userClientService.getUserById(
+                userClientService.findById(
                         userId,
                         accessToken
                 );
