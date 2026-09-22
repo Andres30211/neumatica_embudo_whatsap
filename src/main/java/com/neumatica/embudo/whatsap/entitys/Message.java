@@ -40,11 +40,8 @@ public class Message {
     /*
      * ID del mensaje proporcionado por WhatsApp/Meta.
      *
-     * Ejemplo:
-     * wamid.HBgM...
-     *
-     * Puede ser null en determinados eventos,
-     * por lo que no se establece nullable = false.
+     * Puede ser null para mensajes que todavía no tengan
+     * un wamid disponible.
      */
     @Column(unique = true)
     private String whatsappMessageId;
@@ -58,103 +55,75 @@ public class Message {
     private Conversation conversation;
 
     /*
-     * Dirección del mensaje:
-     * INBOUND  -> Contacto hacia nuestro sistema
-     * OUTBOUND -> Nuestro sistema hacia el contacto
+     * Dirección del mensaje.
+     *
+     * INBOUND:
+     * Cliente -> CRM
+     *
+     * OUTBOUND:
+     * CRM -> Cliente
      */
     @Enumerated(EnumType.STRING)
     private Direction direction;
 
     /*
-     * Tipo de mensaje:
-     * TEXT
-     * IMAGE
-     * VIDEO
-     * AUDIO
-     * DOCUMENT
-     * STICKER
-     * LOCATION
-     * etc.
+     * Usuario del CRM que escribió el mensaje.
+     *
+     * IMPORTANTE:
+     *
+     * Solamente tendrá valor cuando el mensaje sea enviado
+     * manualmente por un vendedor.
+     *
+     * Para mensajes del cliente será null.
+     *
+     * Para mensajes automáticos del BOT también puede ser null.
+     */
+    private UUID senderUserId;
+
+    /*
+     * Tipo de mensaje.
      */
     @Enumerated(EnumType.STRING)
     private MessageType type;
 
     /*
      * Texto del mensaje.
-     *
-     * Puede ser null.
-     *
-     * Ejemplos:
-     *
-     * Mensaje de texto:
-     * body = "Hola, necesito una cotización"
-     *
-     * Imagen sin texto:
-     * body = null
-     *
-     * Imagen con caption:
-     * body = null
-     * caption = "Mira esta referencia"
      */
     @Column(nullable = true, columnDefinition = "TEXT")
     private String body;
 
     /*
-     * ID del archivo multimedia proporcionado por WhatsApp/Meta.
-     *
-     * Ejemplo:
-     * 123456789012345
-     *
-     * Puede ser null cuando el mensaje no contiene multimedia.
+     * ID del archivo multimedia proporcionado por WhatsApp.
      */
     @Column(nullable = true)
     private String mediaId;
 
     /*
-     * Ubicación del archivo multimedia almacenado
-     * por nuestra aplicación.
-     *
-     * Ejemplo:
-     * /uploads/whatsapp/abc123.jpg
-     *
-     * Puede ser null si el mensaje no contiene multimedia
-     * o si todavía no ha sido almacenado.
+     * Ruta donde nuestro sistema almacena el archivo.
      */
     @Column(nullable = true)
     private String storagePath;
 
     /*
-     * Tipo MIME del archivo.
-     *
-     * Ejemplos:
-     * image/jpeg
-     * image/png
-     * video/mp4
-     * audio/ogg
-     * application/pdf
+     * Tipo MIME.
      */
     @Column(nullable = true)
     private String mimeType;
 
     /*
-     * Hash SHA-256 proporcionado por WhatsApp.
+     * Hash SHA-256.
      */
     @Column(nullable = true)
     private String sha256;
 
     /*
-     * Texto que acompaña a una imagen, video o documento.
-     *
-     * Ejemplo:
-     * "Mira esta referencia"
+     * Caption del archivo multimedia.
      */
     @Column(nullable = true, columnDefinition = "TEXT")
     private String caption;
 
     /*
      * Nombre original del archivo.
-     *
-     * Especialmente útil para documentos.
      */
     @Column(nullable = true)
     private String fileName;

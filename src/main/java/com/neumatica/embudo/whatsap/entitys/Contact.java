@@ -50,16 +50,12 @@ public class Contact {
 
     /*
      * Identificador interno de Meta/WhatsApp.
-     *
-     * Puede ser null dependiendo del evento recibido.
      */
     @Column(nullable = true)
     private String metaUserId;
 
     /*
      * Nombre mostrado por WhatsApp.
-     *
-     * También puede ser null si no está disponible.
      */
     @Column(nullable = true)
     private String name;
@@ -77,7 +73,7 @@ public class Contact {
     private String company;
 
     /*
-     * Paso actual del proceso de registro.
+     * Paso actual del proceso automático.
      */
     @Enumerated(EnumType.STRING)
     private RegistrationStep registrationStep;

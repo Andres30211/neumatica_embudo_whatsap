@@ -278,37 +278,35 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	     * Obtenemos o creamos la conversación.
 	     */
 	    Conversation conversation =
-	        this.getOrCreateConversation(
-	            contact
-	        );
+	            this.getOrCreateConversation(contact);
 
-	    /*
-	     * Procesamos completamente el mensaje:
-	     *
-	     * TEXT
-	     * IMAGE
-	     * VIDEO
-	     * AUDIO
-	     * DOCUMENT
-	     * STICKER
-	     * ...
-	     *
-	     * Incluyendo descarga de multimedia.
-	     */
 	    messageProcessingService.process(
-	        messageDTO,
-	        conversation
+	            messageDTO,
+	            conversation
 	    );
 
 	    /*
-	     * A partir de aquí puedes mantener
-	     * tu lógica de negocio actual.
-	     *
-	     * No estamos tocando las respuestas automáticas.
+	     * Si la conversación está siendo atendida
+	     * por un vendedor, NO ejecutamos el bot.
+	     */
+	    if (conversation.getStatus()
+	            == ConversationStatus.HUMAN) {
+
+	        /*
+	         * Aquí posteriormente enviaremos una notificación
+	         * específica al vendedor mediante WebSocket.
+	         */
+
+	        return;
+	    }
+
+	    /*
+	     * Si todavía está en BOT,
+	     * ejecutamos la automatización.
 	     */
 	    processBusinessFlow(
-	        contact,
-	        messageDTO
+	            contact,
+	            messageDTO
 	    );
 	}
 	
@@ -741,27 +739,66 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
     }
 
-    private Conversation getOrCreateConversation(Contact contact) {
+    private Conversation getOrCreateConversation(
+            Contact contact
+    ) {
 
-        return this.conversationRepository
-                .findFirstByContactAndStatus(
-                        contact,
-                        ConversationStatus.BOT
-                )
-                .orElseGet(() -> {
+        /*
+         * Primero buscamos una conversación HUMAN.
+         *
+         * Esto es importante porque significa que
+         * actualmente existe un vendedor atendiendo.
+         */
+        var humanConversation =
+                conversationRepository
+                        .findFirstByContactAndStatus(
+                                contact,
+                                ConversationStatus.HUMAN
+                        );
 
-                    Conversation conversation =
-                            Conversation.builder()
-                                    .contact(contact)
-                                    .status(ConversationStatus.BOT)
-                                    .startedAt(LocalDateTime.now(ZoneId.of("America/Bogota")))
-                                    .lastMessageAt(LocalDateTime.now(ZoneId.of("America/Bogota")))
-                                    .build();
+        if (humanConversation.isPresent()) {
 
-                    return this.conversationRepository.save(conversation);
+            return humanConversation.get();
+        }
 
-                });
+        /*
+         * Si no hay conversación humana,
+         * buscamos la conversación del BOT.
+         */
+        var botConversation =
+                conversationRepository
+                        .findFirstByContactAndStatus(
+                                contact,
+                                ConversationStatus.BOT
+                        );
 
+        if (botConversation.isPresent()) {
+
+            return botConversation.get();
+        }
+
+        /*
+         * Si no existe ninguna conversación activa,
+         * creamos una nueva conversación BOT.
+         */
+        LocalDateTime now =
+                LocalDateTime.now(
+                        ZoneId.of("America/Bogota")
+                );
+
+        Conversation conversation =
+                Conversation.builder()
+                        .contact(contact)
+                        .status(
+                                ConversationStatus.BOT
+                        )
+                        .startedAt(now)
+                        .lastMessageAt(now)
+                        .build();
+
+        return conversationRepository.save(
+                conversation
+        );
     }
 
     private void saveMessage(Conversation conversation,

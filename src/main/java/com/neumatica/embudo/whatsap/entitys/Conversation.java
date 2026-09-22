@@ -20,6 +20,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,9 +42,6 @@ public class Conversation {
 
     /*
      * Contacto asociado a la conversación.
-     *
-     * Puede ser null si WhatsApp/Meta no proporciona
-     * suficiente información para identificar el contacto.
      */
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
@@ -62,20 +60,62 @@ public class Conversation {
     @Builder.Default
     private List<Message> messages = new ArrayList<>();
 
+    /*
+     * Estado actual de la conversación.
+     *
+     * BOT:
+     * La conversación está siendo manejada por el bot.
+     *
+     * HUMAN:
+     * La conversación está siendo manejada por un vendedor.
+     *
+     * CLOSED:
+     * La conversación fue cerrada.
+     */
     @Enumerated(EnumType.STRING)
     private ConversationStatus status;
 
     /*
-     * BOT
-     * HUMAN
+     * UUID del vendedor asignado.
+     *
+     * IMPORTANTE:
+     *
+     * Este NO es una relación @ManyToOne porque User
+     * pertenece a otro microservicio.
+     *
+     * Aquí solamente almacenamos el UUID del usuario.
      */
-    private String assignedTo;
+    private UUID assignedUserId;
 
+    /*
+     * Fecha y hora en la que el vendedor tomó
+     * la conversación.
+     */
+    private LocalDateTime assignedAt;
+
+    /*
+     * Fecha de inicio de la conversación.
+     */
     private LocalDateTime startedAt;
 
+    /*
+     * Fecha del último mensaje.
+     */
     private LocalDateTime lastMessageAt;
 
+    /*
+     * Fecha en la que se cerró la conversación.
+     */
     private LocalDateTime closedAt;
+
+    /*
+     * Control de concurrencia optimista.
+     *
+     * Evita problemas cuando dos operaciones intentan
+     * modificar la misma conversación al mismo tiempo.
+     */
+    @Version
+    private Long version;
 
     /*
      * Agrega un mensaje manteniendo la relación bidireccional.
