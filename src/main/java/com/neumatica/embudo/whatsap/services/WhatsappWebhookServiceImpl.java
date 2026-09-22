@@ -288,14 +288,40 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	    /*
 	     * Si la conversación está siendo atendida
 	     * por un vendedor, NO ejecutamos el bot.
+	     *
+	     * El mensaje ya fue procesado y guardado por
+	     * MessageProcessingService.
+	     *
+	     * Ahora recuperamos el mensaje persistido y lo
+	     * publicamos mediante WebSocket para que el vendedor
+	     * lo vea inmediatamente en el chat.
 	     */
 	    if (conversation.getStatus()
 	            == ConversationStatus.HUMAN) {
 
+	        Message realtimeMessage =
+	                this.messageRepository
+	                        .findByWhatsappMessageId(
+	                                messageDTO.getId()
+	                        )
+	                        .orElse(null);
+
+	        if (realtimeMessage != null) {
+
+	            this.notificationService
+	                    .sendConversationMessage(
+	                            conversation.getId(),
+	                            realtimeMessage
+	                    );
+	        }
+
 	        /*
-	         * Aquí posteriormente enviaremos una notificación
-	         * específica al vendedor mediante WebSocket.
+	         * También conservamos la notificación general
+	         * que ya utiliza el CRM.
 	         */
+	        this.notificationService.sendNotification(
+	                contact
+	        );
 
 	        return;
 	    }
