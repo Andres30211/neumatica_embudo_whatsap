@@ -19,6 +19,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
@@ -52,13 +53,15 @@ public class Conversation {
      * Mensajes de la conversación.
      */
     @OneToMany(
-        mappedBy = "conversation",
-        cascade = CascadeType.ALL,
-        fetch = FetchType.LAZY,
-        orphanRemoval = true
-    )
-    @Builder.Default
-    private List<Message> messages = new ArrayList<>();
+    	    mappedBy = "conversation",
+    	    cascade = CascadeType.ALL,
+    	    fetch = FetchType.LAZY,
+    	    orphanRemoval = true
+    	)
+    	@OrderBy("createdAt ASC")
+    	@Builder.Default
+    	private List<Message> messages =
+    	        new ArrayList<>();
 
     /*
      * Estado actual de la conversación.

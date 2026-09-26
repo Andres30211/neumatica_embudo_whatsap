@@ -15,6 +15,7 @@ import com.neumatica.embudo.whatsap.enums.MessageType;
 import com.neumatica.embudo.whatsap.repository.ConversationRepository;
 import com.neumatica.embudo.whatsap.repository.MessageRepository;
 import com.neumatica.embudo.whatsap.repository.WhatsappResponseAutimatics;
+import com.neumatica.embudo.whatsap.websocket.NotificationService;
 
 import jakarta.transaction.Transactional;
 
@@ -40,11 +41,15 @@ public class ManualMessageService {
     private final UserClientService
             userClientService;
 
+    private final NotificationService
+            notificationService;
+
     public ManualMessageService(
             ConversationRepository conversationRepository,
             MessageRepository messageRepository,
             WhatsappResponseAutimatics whatsappResponseAutimatics,
-            UserClientService userClientService
+            UserClientService userClientService,
+            NotificationService notificationService
     ) {
 
         this.conversationRepository =
@@ -58,6 +63,9 @@ public class ManualMessageService {
 
         this.userClientService =
                 userClientService;
+
+        this.notificationService =
+                notificationService;
     }
 
     /**
@@ -321,10 +329,19 @@ public class ManualMessageService {
                 conversation
         );
 
+        notificationService.sendConversationMessageAfterCommit(
+                conversation.getId(),
+                message
+        );
+
+        notificationService.sendConversationSummaryAfterCommit(
+                conversation,
+                message
+        );
 
         /*
          * ============================================================
-         * 13. DEVOLVEMOS EL MENSAJE
+         * 14. DEVOLVEMOS EL MENSAJE
          * ============================================================
          */
 

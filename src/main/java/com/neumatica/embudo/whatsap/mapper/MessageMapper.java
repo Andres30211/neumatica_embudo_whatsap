@@ -1,6 +1,7 @@
 package com.neumatica.embudo.whatsap.mapper;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 import org.springframework.stereotype.Component;
 
@@ -19,25 +20,35 @@ public class MessageMapper {
     /*
      * Convierte un MessageDto en Message.
      */
+	private static final ZoneId ZONE_ID =
+            ZoneId.of("America/Bogota");
+
     public Message toEntity(
             MessageDto dto) {
 
         Message message =
                 Message.builder()
+
                         .whatsappMessageId(
                                 dto.getId()
                         )
+
                         .direction(
                                 Direction.INCOMING
                         )
+
                         .createdAt(
-                                LocalDateTime.now()
+                                LocalDateTime.now(
+                                        ZONE_ID
+                                )
                         )
+
                         .whatsappTimestamp(
                                 parseTimestamp(
                                         dto.getTimestamp()
                                 )
                         )
+
                         .build();
 
         /*

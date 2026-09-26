@@ -21,19 +21,6 @@ import com.neumatica.embudo.whatsap.services.ManualMessageService;
 
 import lombok.RequiredArgsConstructor;
 
-/**
- * Endpoints relacionados con las conversaciones
- * y la atención humana.
- *
- * IMPORTANTE:
- *
- * El usuario NO se recibe desde Angular.
- *
- * El UUID del vendedor se obtiene directamente
- * desde el JWT mediante:
- *
- * jwt.getSubject()
- */
 @RestController
 @RequestMapping("/api/conversations")
 @RequiredArgsConstructor
@@ -50,14 +37,6 @@ public class ConversationController {
      * ============================================================
      * TOMAR CONVERSACIÓN
      * ============================================================
-     *
-     * POST:
-     *
-     * /api/conversations/{conversationId}/take
-     *
-     * No necesita body.
-     *
-     * El vendedor sale del JWT.
      */
     @PostMapping("/{conversationId}/take")
     public ResponseEntity<Conversation> takeConversation(
@@ -68,7 +47,8 @@ public class ConversationController {
 
     ) {
 
-        UUID userId = getUserIdFromJwt(jwt);
+        UUID userId =
+                getUserIdFromJwt(jwt);
 
         String accessToken =
                 jwt.getTokenValue();
@@ -88,18 +68,6 @@ public class ConversationController {
      * ============================================================
      * ENVIAR MENSAJE MANUAL
      * ============================================================
-     *
-     * POST:
-     *
-     * /api/conversations/{conversationId}/messages
-     *
-     * Body:
-     *
-     * {
-     *     "message": "Hola, ¿cómo podemos ayudarte?"
-     * }
-     *
-     * El userId NO se recibe.
      */
     @PostMapping("/{conversationId}/messages")
     public ResponseEntity<Message> sendMessage(
@@ -199,12 +167,10 @@ public class ConversationController {
 
     /**
      * ============================================================
-     * OBTENER UUID DEL USUARIO
+     * OBTENER UUID DEL USUARIO DESDE JWT
      * ============================================================
      */
-    private UUID getUserIdFromJwt(
-            Jwt jwt
-    ) {
+    private UUID getUserIdFromJwt(Jwt jwt) {
 
         if (jwt == null) {
 
@@ -216,8 +182,10 @@ public class ConversationController {
         String subject =
                 jwt.getSubject();
 
-        if (subject == null ||
-                subject.isBlank()) {
+        if (
+                subject == null ||
+                subject.isBlank()
+        ) {
 
             throw new RuntimeException(
                     "El JWT no contiene el subject del usuario."

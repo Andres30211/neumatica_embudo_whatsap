@@ -22,9 +22,6 @@ public class SecurityConfig {
                  * ====================================================
                  * CORS
                  * ====================================================
-                 *
-                 * Spring utilizará el bean corsConfigurationSource()
-                 * que ya tienes definido en CorsConfig.java.
                  */
                 .cors(Customizer.withDefaults())
 
@@ -33,9 +30,6 @@ public class SecurityConfig {
                  * ====================================================
                  * CSRF
                  * ====================================================
-                 *
-                 * No utilizamos CSRF porque nuestra API trabaja
-                 * con JWT y no con sesiones de navegador.
                  */
                 .csrf(csrf -> csrf.disable())
 
@@ -45,9 +39,7 @@ public class SecurityConfig {
                  * SESIONES
                  * ====================================================
                  *
-                 * La aplicación es Stateless.
-                 *
-                 * Cada petición autenticada debe traer su JWT.
+                 * API completamente stateless.
                  */
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
@@ -65,11 +57,8 @@ public class SecurityConfig {
 
                         /*
                          * ------------------------------------------------
-                         * WEBHOOK DE WHATSAPP / META
+                         * WEBHOOK WHATSAPP / META
                          * ------------------------------------------------
-                         *
-                         * Meta necesita poder llamar a estos endpoints
-                         * sin tener el JWT de un vendedor.
                          */
                         .requestMatchers(
                                 "/webhook/**"
@@ -81,10 +70,13 @@ public class SecurityConfig {
                          * WEBSOCKET
                          * ------------------------------------------------
                          *
-                         * Permitimos el handshake inicial.
+                         * IMPORTANTE:
                          *
-                         * Posteriormente podremos autenticar el usuario
-                         * mediante STOMP.
+                         * El handshake inicial del WebSocket debe poder
+                         * realizarse sin JWT HTTP.
+                         *
+                         * La autenticación STOMP puede realizarse
+                         * posteriormente en el frame CONNECT.
                          */
                         .requestMatchers(
                                 "/wss",
@@ -94,10 +86,8 @@ public class SecurityConfig {
 
                         /*
                          * ------------------------------------------------
-                         * PETICIONES OPTIONS
+                         * CORS / PREFLIGHT
                          * ------------------------------------------------
-                         *
-                         * Necesarias para CORS/preflight de Angular.
                          */
                         .requestMatchers(
                                 HttpMethod.OPTIONS,
@@ -107,18 +97,11 @@ public class SecurityConfig {
 
                         /*
                          * ------------------------------------------------
-                         * CONVERSACIONES
+                         * REST API
                          * ------------------------------------------------
                          *
-                         * Estas rutas SÍ requieren autenticación JWT.
-                         *
-                         * Ejemplo:
-                         *
-                         * POST /api/conversations/{id}/take
-                         *
-                         * El controlador obtiene el usuario mediante:
-                         *
-                         * @AuthenticationPrincipal Jwt jwt
+                         * Las conversaciones siguen protegidas mediante
+                         * JWT.
                          */
                         .requestMatchers(
                                 "/api/conversations/**"
@@ -127,7 +110,7 @@ public class SecurityConfig {
 
                         /*
                          * ------------------------------------------------
-                         * TODO LO DEMÁS
+                         * RESTO DE LA APLICACIÓN
                          * ------------------------------------------------
                          */
                         .anyRequest().authenticated()
@@ -138,12 +121,6 @@ public class SecurityConfig {
                  * ====================================================
                  * JWT RESOURCE SERVER
                  * ====================================================
-                 *
-                 * Angular envía:
-                 *
-                 * Authorization: Bearer <JWT>
-                 *
-                 * Spring Security valida el JWT.
                  */
                 .oauth2ResourceServer(
                         oauth2 -> oauth2.jwt(

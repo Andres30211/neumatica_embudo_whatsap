@@ -13,11 +13,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.neumatica.embudo.whatsap.dto.brevo.EmailRequestDto;
+import com.neumatica.embudo.whatsap.dto.contact.ConversationSummaryResponse;
+import com.neumatica.embudo.whatsap.dto.user.UserResponseDto;
 import com.neumatica.embudo.whatsap.dto.webhook.ChageDto;
 import com.neumatica.embudo.whatsap.dto.webhook.ContactDto;
 import com.neumatica.embudo.whatsap.dto.webhook.EntryDto;
@@ -28,7 +29,10 @@ import com.neumatica.embudo.whatsap.entitys.Contact;
 import com.neumatica.embudo.whatsap.entitys.Conversation;
 import com.neumatica.embudo.whatsap.entitys.Message;
 import com.neumatica.embudo.whatsap.enums.ConversationStatus;
+import com.neumatica.embudo.whatsap.enums.Direction;
+import com.neumatica.embudo.whatsap.enums.MessageType;
 import com.neumatica.embudo.whatsap.enums.RegistrationStep;
+import com.neumatica.embudo.whatsap.interfaces.ConversationSummaryProjection;
 import com.neumatica.embudo.whatsap.mapper.ContactMapper;
 import com.neumatica.embudo.whatsap.mapper.MessageMapper;
 import com.neumatica.embudo.whatsap.repository.ContactRepository;
@@ -39,7 +43,9 @@ import com.neumatica.embudo.whatsap.repository.WhatsappWebhookService;
 import com.neumatica.embudo.whatsap.websocket.NotificationService;
 
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
@@ -71,42 +77,126 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	@Autowired
 	private MessageProcessingService messageProcessingService;
+	
+	@Autowired
+	private UserClientService userClientService;
 
     WhatsappWebhookServiceImpl(MediaStorageServiceImpl mediaStorageServiceImpl) {
         this.mediaStorageServiceImpl = mediaStorageServiceImpl;
     }
 	
-	@Override
-	//@Transactional(readOnly = true)
-	public Page<Contact> contacts(int page) {
+    @Override
+    //@Transactional(readOnly = true)
+    public Page<ConversationSummaryResponse> contacts(
+            int page,
+            String accessToken
+    ) {
 
-	    Pageable pageable = PageRequest.of(
-	            page,
-	            5,
-	            Sort.by(Sort.Direction.DESC, "createdAt")
-	    );
+        Pageable pageable =
+                PageRequest.of(
+                        page,
+                        5
+                );
 
-	    Page<Contact> contactPage =
-	            this.contactRepository.findAll(pageable);
+        Page<ConversationSummaryProjection> conversationPage =
+                this.conversationRepository
+                        .findConversationSummaries(
+                                pageable
+                        );
 
-	    for (Contact contact : contactPage.getContent()) {
+        return conversationPage.map(conversation -> {
 
-	        List<Conversation> conversations =
-	                this.conversationRepository.findByContact(contact);
+            UUID assignedUserId =
+                    conversation.getAssignedUserId();
 
-	        for (Conversation conversation : conversations) {
+            String assignedUserName = null;
 
-	            List<Message> messages =
-	                    this.messageRepository.findByConversation(conversation);
+            /*
+             * Si existe un vendedor asignado,
+             * consultamos su información en el
+             * microservicio de seguridad.
+             */
+            if (assignedUserId != null) {
 
-	            conversation.setMessages(messages);
-	        }
+                try {
 
-	        contact.setConversations(conversations);
-	    }
+                    UserResponseDto user =
+                            userClientService.findById(
+                                    assignedUserId,
+                                    accessToken
+                            );
 
-	    return contactPage;
-	}
+                    if (user != null) {
+
+                        assignedUserName =
+                                user.getName();
+                    }
+
+                } catch (Exception exception) {
+
+                    /*
+                     * Si temporalmente el servicio de usuarios
+                     * no responde, no dejamos caer toda la lista
+                     * de conversaciones.
+                     */
+                    log.warn(
+                            "No fue posible obtener el vendedor asignado. userId={}",
+                            assignedUserId,
+                            exception
+                    );
+                }
+            }
+
+            return ConversationSummaryResponse
+                    .builder()
+
+                    .conversationId(
+                            conversation.getConversationId()
+                    )
+
+                    .contactId(
+                            conversation.getContactId()
+                    )
+
+                    .contactName(
+                            conversation.getContactName()
+                    )
+
+                    .phone(
+                            conversation.getPhone()
+                    )
+
+                    .registrationStep(
+                            conversation.getRegistrationStep()
+                    )
+
+                    .lastMessage(
+                            conversation.getLastMessage()
+                    )
+
+                    .lastMessageType(
+                            conversation.getLastMessageType()
+                    )
+
+                    .lastMessageAt(
+                            conversation.getLastMessageAt()
+                    )
+
+                    .status(
+                            conversation.getStatus()
+                    )
+
+                    .assignedUserId(
+                            assignedUserId
+                    )
+
+                    .assignedUserName(
+                            assignedUserName
+                    )
+
+                    .build();
+        });
+    }
 	
 	/*
 	 * Procesa el webhook recibido desde WhatsApp.
@@ -247,6 +337,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	private void processMessage(
 	        ValueDto value,
 	        MessageDto messageDTO) {
+		
 
 	    if (messageDTO == null) {
 	        return;
@@ -285,55 +376,50 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	            conversation
 	    );
 
-	    /*
-	     * Si la conversación está siendo atendida
-	     * por un vendedor, NO ejecutamos el bot.
-	     *
-	     * El mensaje ya fue procesado y guardado por
-	     * MessageProcessingService.
-	     *
-	     * Ahora recuperamos el mensaje persistido y lo
-	     * publicamos mediante WebSocket para que el vendedor
-	     * lo vea inmediatamente en el chat.
-	     */
-	    if (conversation.getStatus()
-	            == ConversationStatus.HUMAN) {
+    /*
+     * El mensaje entrante ya fue procesado y persistido por
+     * MessageProcessingService. Lo publicamos para TODOS los estados
+     * (BOT y HUMAN).
+     */
+    Message realtimeMessage =
+            this.messageRepository
+                    .findByWhatsappMessageId(
+                            messageDTO.getId()
+                    )
+                    .orElse(null);
 
-	        Message realtimeMessage =
-	                this.messageRepository
-	                        .findByWhatsappMessageId(
-	                                messageDTO.getId()
-	                        )
-	                        .orElse(null);
+    if (realtimeMessage != null) {
 
-	        if (realtimeMessage != null) {
+        this.notificationService
+                .sendConversationMessageAfterCommit(
+                        conversation.getId(),
+                        realtimeMessage
+                );
 
-	            this.notificationService
-	                    .sendConversationMessage(
-	                            conversation.getId(),
-	                            realtimeMessage
-	                    );
-	        }
+        this.notificationService
+                .sendConversationSummaryAfterCommit(
+                        conversation,
+                        realtimeMessage
+                );
+    }
 
-	        /*
-	         * También conservamos la notificación general
-	         * que ya utiliza el CRM.
-	         */
-	        this.notificationService.sendNotification(
-	                contact
-	        );
+    this.notificationService.sendNotification(contact);
 
-	        return;
-	    }
+    /*
+     * Si la conversación está en atención humana, no ejecutamos el bot.
+     */
+    if (conversation.getStatus() == ConversationStatus.HUMAN) {
+        return;
+    }
 
-	    /*
-	     * Si todavía está en BOT,
-	     * ejecutamos la automatización.
-	     */
-	    processBusinessFlow(
-	            contact,
-	            messageDTO
-	    );
+    /*
+     * Si continúa en BOT, ejecutamos la automatización.
+     */
+    processBusinessFlow(
+            contact,
+            conversation,
+            messageDTO
+    );
 	}
 	
 	 /*
@@ -447,6 +533,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	private void processBusinessFlow(
 	        Contact contact,
+	        Conversation conversation,
 	        MessageDto messageDTO) {
 
 	    if (contact == null) {
@@ -470,7 +557,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
 	    if (!hasPhone) {
 
-	        addNoPhoneObservation(messageDTO);
+	        addNoPhoneObservation(contact, messageDTO, conversation);
 
 	        return;
 	    }
@@ -514,22 +601,15 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	             * horario de atención.
 	             */
 	            sendAutomaticMessage(
-	                    contact,
-
-	                    "Bienvenido a Neumática Industrial S.A.S.\n"
-	                    .concat(
-	                            "Especialistas en automatización, neumática y aire comprimido.\n"
-	                    )
-	                    .concat(
-	                            "Para brindarte una atención más ágil, por favor envía en un solo mensaje:\n\n"
-	                    )
-	                    .concat(
-	                            ". Correo electrónico (en minúscula)\n"
-	                    )
-	                    .concat(
-	                            ". Nombre de la empresa (sin caracteres especiales)\n"
-	                    )
-	            );
+	            	    contact,
+	            	    conversation,
+	            	    "Bienvenido a Neumática Industrial S.A.S.\n\n"
+	            	        + "Especialistas en automatización, neumática y aire comprimido.\n\n"
+	            	        + "Para brindarte una atención más ágil, por favor indícanos:\n\n"
+	            	        + "📧 Tu correo electrónico\n"
+	            	        + "🏢 Nombre de la empresa\n\n"
+	            	        + "Puedes enviarnos los datos juntos."
+	            	);
 	        }
 
 	        case EMAILANDCOMPANY -> {
@@ -543,9 +623,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	            );
 
 	            processEmailAndCompany(
-	                    contact,
-	                    messageDTO
-	            );
+                    contact,
+                    conversation,
+                    messageDTO
+            );
 	        }
 
 	        case COMPLETED -> {
@@ -559,9 +640,10 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	            );
 
 	            sendAutomaticMessage(
-	                    contact,
+							contact,
+							conversation,
 
-	                    "Hola "
+							"Hola "
 	                    .concat(contact.getName())
 	                    .concat(
 	                            "\nBienvenido nuevamente a nuestro canal de atención; revisaremos tus datos y en unos minutos un asesor se comunicará contigo..."
@@ -573,85 +655,114 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	
 	
 	private void addNoPhoneObservation(
-	        MessageDto messageDTO) {
+	        Contact contact,
+	        MessageDto messageDTO,
+	        Conversation conversation) {
 
 	    /*
-	     * Validamos que tengamos el ID del mensaje recibido
-	     * para poder localizarlo en la base de datos.
+	     * Esta función solamente debe ejecutarse cuando el contacto
+	     * realmente no tiene un número de teléfono.
 	     */
-	    if (messageDTO == null
-	            || messageDTO.getId() == null
-	            || messageDTO.getId().isBlank()) {
+	    if (contact == null
+	            || contact.getPhone() == null
+	            || contact.getPhone().isBlank()) {
 
-	        return;
+	        /*
+	         * Necesitamos el ID del mensaje únicamente para localizar
+	         * el mensaje que ya fue guardado.
+	         *
+	         * La existencia del mensaje NO determina si el contacto
+	         * tiene teléfono.
+	         */
+	        if (messageDTO == null
+	                || messageDTO.getId() == null
+	                || messageDTO.getId().isBlank()) {
+
+	            return;
+	        }
+
+	        /*
+	         * Buscamos el mensaje que acabamos de guardar.
+	         */
+	        Message message =
+	                this.messageRepository
+	                        .findByWhatsappMessageId(
+	                                messageDTO.getId()
+	                        )
+	                        .orElse(null);
+
+	        if (message == null) {
+	            return;
+	        }
+
+	        /*
+	         * Mensaje interno que queremos dejar registrado
+	         * para que posteriormente pueda ser visualizado
+	         * desde el CRM.
+	         */
+	        String observation =
+	                "[SISTEMA] Este contacto no tiene un número de teléfono "
+	                + "disponible. Actualmente no puede ser atendido mediante "
+	                + "respuesta automática de WhatsApp. El contacto y su mensaje "
+	                + "han sido conservados para futuras implementaciones de atención.";
+
+	        /*
+	         * Si el mensaje original es de texto, agregamos
+	         * la observación al contenido existente.
+	         */
+	        if (message.getBody() != null
+	                && !message.getBody().isBlank()) {
+
+	            message.setBody(
+	                    message.getBody()
+	                            + "\n\n"
+	                            + observation
+	            );
+
+	        /*
+	         * Si es multimedia y tiene caption, agregamos
+	         * la observación al caption.
+	         */
+	        } else if (message.getCaption() != null
+	                && !message.getCaption().isBlank()) {
+
+	            message.setCaption(
+	                    message.getCaption()
+	                            + "\n\n"
+	                            + observation
+	            );
+
+	        /*
+	         * Si es multimedia pero no tiene caption,
+	         * utilizamos el caption para almacenar la observación.
+	         */
+	        } else {
+
+	            message.setCaption(observation);
+	        }
+
+	        /*
+	         * Persistimos nuevamente el mensaje.
+	         */
+	        this.messageRepository.save(message);
+
+	        /*
+	         * Actualizamos tiempo real solamente si existe
+	         * una conversación.
+	         */
+	        if (conversation != null) {
+
+	            this.notificationService.sendConversationMessageAfterCommit(
+	                    conversation.getId(),
+	                    message
+	            );
+
+	            this.notificationService.sendConversationSummaryAfterCommit(
+	                    conversation,
+	                    message
+	            );
+	        }
 	    }
-
-	    /*
-	     * Buscamos el mensaje que acabamos de guardar.
-	     */
-	    Message message =
-	            this.messageRepository
-	                    .findByWhatsappMessageId(
-	                            messageDTO.getId()
-	                    )
-	                    .orElse(null);
-
-	    if (message == null) {
-	        return;
-	    }
-
-	    /*
-	     * Mensaje interno que queremos dejar registrado
-	     * para que posteriormente pueda ser visualizado
-	     * desde el CRM.
-	     */
-	    String observation =
-	            "[SISTEMA] Este contacto no tiene un número de teléfono "
-	            + "disponible. Actualmente no puede ser atendido mediante "
-	            + "respuesta automática de WhatsApp. El contacto y su mensaje "
-	            + "han sido conservados para futuras implementaciones de atención.";
-
-	    /*
-	     * Si el mensaje original es de texto, agregamos la observación
-	     * al contenido existente.
-	     */
-	    if (message.getBody() != null
-	            && !message.getBody().isBlank()) {
-
-	        message.setBody(
-	                message.getBody()
-	                        + "\n\n"
-	                        + observation
-	        );
-
-	    /*
-	     * Si es multimedia y tiene caption, agregamos la observación
-	     * al caption.
-	     */
-	    } else if (message.getCaption() != null
-	            && !message.getCaption().isBlank()) {
-
-	        message.setCaption(
-	                message.getCaption()
-	                        + "\n\n"
-	                        + observation
-	        );
-
-	    /*
-	     * Si es multimedia pero no tiene caption, utilizamos
-	     * el caption para almacenar la observación.
-	     */
-	    } else {
-
-	        message.setCaption(
-	                observation
-	        );
-	    }
-
-	    /*
-	     * Persistimos nuevamente el mensaje.
-	     */
-	    this.messageRepository.save(message);
 	}
 
 
@@ -661,38 +772,202 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	        MessageDto messageDTO) {
 
 	    /*
-	     * Intentamos identificar al contacto
-	     * mediante la información disponible.
+	     * ============================================================
+	     * 1. OBTENER EL TELÉFONO / WHATSAPP ID
+	     * ============================================================
+	     *
+	     * WhatsApp puede enviar el identificador en:
+	     *
+	     *     contacts[].wa_id
+	     *
+	     * pero en nuestros webhooks hemos encontrado casos donde
+	     * ese valor viene null y el número real está en:
+	     *
+	     *     messages[].from
+	     *
+	     * Por eso utilizamos from como respaldo.
 	     */
 
-	    if (dto != null &&
-	        dto.getWaId() != null &&
-	        !dto.getWaId().isBlank()) {
+	    String phone = null;
 
-	        return contactRepository
-	            .findByPhone(dto.getWaId())
-	            .orElseGet(() ->
-	                createContact(dto)
-	            );
+	    if (dto != null
+	            && dto.getWaId() != null
+	            && !dto.getWaId().isBlank()) {
+
+	        phone = dto.getWaId();
+
+	    } else if (messageDTO != null
+	            && messageDTO.getFrom() != null
+	            && !messageDTO.getFrom().isBlank()) {
+
+	        phone = messageDTO.getFrom();
 	    }
 
-	    if (dto != null &&
-	        dto.getUserId() != null &&
-	        !dto.getUserId().isBlank()) {
-
-	        return contactRepository
-	            .findByMetaUserId(dto.getUserId())
-	            .orElseGet(() ->
-	                createContact(dto)
-	            );
-	    }
 
 	    /*
-	     * No tenemos identificadores suficientes.
-	     *
-	     * Aun así creamos un contacto parcial.
+	     * ============================================================
+	     * 2. OBTENER META USER ID
+	     * ============================================================
 	     */
-	    return createContact(dto);
+
+	    String metaUserId = null;
+
+	    if (dto != null
+	            && dto.getUserId() != null
+	            && !dto.getUserId().isBlank()) {
+
+	        metaUserId = dto.getUserId();
+
+	    } else if (messageDTO != null
+	            && messageDTO.getFromUserId() != null
+	            && !messageDTO.getFromUserId().isBlank()) {
+
+	        metaUserId = messageDTO.getFromUserId();
+	    }
+
+
+	    /*
+	     * ============================================================
+	     * 3. BUSCAR POR TELÉFONO
+	     * ============================================================
+	     *
+	     * El teléfono / WhatsApp ID es el identificador principal
+	     * que utilizaremos para evitar contactos duplicados.
+	     */
+
+	    if (phone != null && !phone.isBlank()) {
+
+	        var existingContact =
+	                this.contactRepository.findByPhone(phone);
+
+	        if (existingContact.isPresent()) {
+
+	            Contact contact = existingContact.get();
+
+	            /*
+	             * Actualizamos información disponible del contacto.
+	             */
+
+	            if (dto != null
+	                    && dto.getProfile() != null
+	                    && dto.getProfile().getName() != null
+	                    && !dto.getProfile().getName().isBlank()) {
+
+	                contact.setName(
+	                        dto.getProfile().getName()
+	                );
+	            }
+
+	            /*
+	             * Si anteriormente no tenía Meta User ID,
+	             * aprovechamos el que acaba de llegar.
+	             */
+
+	            if ((contact.getMetaUserId() == null
+	                    || contact.getMetaUserId().isBlank())
+	                    && metaUserId != null
+	                    && !metaUserId.isBlank()) {
+
+	                contact.setMetaUserId(
+	                        metaUserId
+	                );
+	            }
+
+	            /*
+	             * Actualizamos la última interacción.
+	             */
+
+	            contact.setLastInteraction(
+	                    LocalDateTime.now(
+	                            ZoneId.of("America/Bogota")
+	                    )
+	            );
+
+	            return this.contactRepository.save(
+	                    contact
+	            );
+	        }
+	    }
+
+
+	    /*
+	     * ============================================================
+	     * 4. BUSCAR POR META USER ID
+	     * ============================================================
+	     */
+
+	    if (metaUserId != null
+	            && !metaUserId.isBlank()) {
+
+	        var existingContact =
+	                this.contactRepository.findByMetaUserId(
+	                        metaUserId
+	                );
+
+	        if (existingContact.isPresent()) {
+
+	            Contact contact = existingContact.get();
+
+	            /*
+	             * Si el contacto anteriormente no tenía teléfono,
+	             * ahora podemos completarlo utilizando messageDTO.from.
+	             */
+
+	            if ((contact.getPhone() == null
+	                    || contact.getPhone().isBlank())
+	                    && phone != null
+	                    && !phone.isBlank()) {
+
+	                contact.setPhone(
+	                        phone
+	                );
+	            }
+
+	            /*
+	             * Actualizamos el nombre si WhatsApp lo proporciona.
+	             */
+
+	            if (dto != null
+	                    && dto.getProfile() != null
+	                    && dto.getProfile().getName() != null
+	                    && !dto.getProfile().getName().isBlank()) {
+
+	                contact.setName(
+	                        dto.getProfile().getName()
+	                );
+	            }
+
+	            /*
+	             * Actualizamos la última interacción.
+	             */
+
+	            contact.setLastInteraction(
+	                    LocalDateTime.now(
+	                            ZoneId.of("America/Bogota")
+	                    )
+	            );
+
+	            return this.contactRepository.save(
+	                    contact
+	            );
+	        }
+	    }
+
+
+	    /*
+	     * ============================================================
+	     * 5. NO EXISTE → CREAR CONTACTO
+	     * ============================================================
+	     *
+	     * En este punto ya sabemos que no encontramos un contacto
+	     * existente por teléfono ni por Meta User ID.
+	     */
+
+	    return createContact(
+	            dto,
+	            phone,
+	            metaUserId
+	    );
 	}
 	
 	/*
@@ -706,64 +981,83 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 	 * @param contactDto información recibida desde WhatsApp.
 	 * @return contacto persistido en la base de datos.
 	 */
-	private Contact createContact(ContactDto contactDto) {
-
-	    String phone = contactDto.getWaId();
-	    String metaUserId = contactDto.getUserId();
+	private Contact createContact(
+	        ContactDto contactDto,
+	        String phone,
+	        String metaUserId) {
 
 	    /*
-	     * El perfil puede no venir en determinados eventos.
-	     * Por eso nunca debemos hacer directamente:
-	     *
-	     * contactDto.getProfile().getName()
-	     *
-	     * porque podría producir un NullPointerException.
+	     * ============================================================
+	     * VALIDACIÓN
+	     * ============================================================
 	     */
+
+	    if (contactDto == null) {
+
+	        throw new IllegalArgumentException(
+	                "No es posible crear un contacto sin ContactDto."
+	        );
+	    }
+
+
+	    /*
+	     * ============================================================
+	     * OBTENER NOMBRE
+	     * ============================================================
+	     */
+
 	    String name = null;
 
-	    if (contactDto.getProfile() != null) {
+	    if (contactDto.getProfile() != null
+	            && contactDto.getProfile().getName() != null
+	            && !contactDto.getProfile().getName().isBlank()) {
+
 	        name = contactDto.getProfile().getName();
 	    }
 
-	    LocalDateTime now = LocalDateTime.now(ZoneId.of("America/Bogota"));
 
-	    Contact contact = Contact.builder()
-	            .phone(phone)
-	            .metaUserId(metaUserId)
-	            .name(name)
-	            .registrationStep(RegistrationStep.GREETING)
-	            .firstContact(now)
-	            .lastInteraction(now)
-	            .createdAt(now)
-	            .build();
+	    /*
+	     * ============================================================
+	     * FECHA ACTUAL
+	     * ============================================================
+	     */
 
-	    return contactRepository.save(contact);
+	    LocalDateTime now =
+	            LocalDateTime.now(
+	                    ZoneId.of("America/Bogota")
+	            );
+
+
+	    /*
+	     * ============================================================
+	     * CREAR CONTACTO
+	     * ============================================================
+	     */
+
+	    Contact contact =
+	            Contact.builder()
+	                    .phone(phone)
+	                    .metaUserId(metaUserId)
+	                    .name(name)
+	                    .registrationStep(
+	                            RegistrationStep.GREETING
+	                    )
+	                    .firstContact(now)
+	                    .lastInteraction(now)
+	                    .createdAt(now)
+	                    .build();
+
+
+	    /*
+	     * ============================================================
+	     * GUARDAR
+	     * ============================================================
+	     */
+
+	    return this.contactRepository.save(
+	            contact
+	    );
 	}
-	
-
-    private Contact getOrCreateContact(ContactDto dto) {
-
-        return this.contactRepository.findByPhone(dto.getWaId())
-                .map(contact -> {
-
-                    contact.setName(dto.getProfile().getName());
-
-                    contact.setLastInteraction(LocalDateTime.now(ZoneId.of("America/Bogota")));
-
-                    return this.contactRepository.save(contact);
-
-                })
-                .orElseGet(() -> {
-
-                    Contact contact = contactMapper.toEntity(dto);
-                    
-                    contact.setRegistrationStep(RegistrationStep.GREETING);
-
-                    return this.contactRepository.save(contact);
-
-                });
-
-    }
 
     private Conversation getOrCreateConversation(
             Contact contact
@@ -827,29 +1121,9 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         );
     }
 
-    private void saveMessage(Conversation conversation,
-                             MessageDto dto) {
-    	
-        if (this.messageRepository.existsByWhatsappMessageId(dto.getId())) {
-            return;
-        }
-
-        Message message = this.messageMapper.toEntity(dto);
-
-        conversation.addMessage(message);
-        
-        conversation.setLastMessageAt(
-        	    Instant.ofEpochSecond(Long.parseLong(dto.getTimestamp()))
-        	           .atZone(ZoneId.of("America/Bogota"))
-        	           .toLocalDateTime()
-        	);
-
-        this.conversationRepository.save(conversation);
-
-    }
-
     public void processEmailAndCompany(
             Contact contact,
+            Conversation conversation,
             MessageDto messageDTO) {
 
         if (contact == null || messageDTO == null) {
@@ -875,8 +1149,16 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         }
 
         Pattern pattern = Pattern.compile(
-                "^\\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})\\s*\\r?\\n\\s*(.+?)\\s*$",
-                Pattern.MULTILINE
+        		"^\\s*(?:" +
+        		        "(?<email>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})" +
+        		        "[\\s,;:\\-]+" +
+        		        "(?<company>.+?)" +
+        		    "|" +
+        		        "(?<companyFirst>.+?)" +
+        		        "[\\s,;:\\-]+" +
+        		        "(?<emailSecond>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})" +
+        		    ")\\s*$",
+        		    Pattern.CASE_INSENSITIVE | Pattern.DOTALL
         );
 
         Matcher matcher =
@@ -897,6 +1179,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
 
             sendAutomaticMessage(
                     contact,
+                    conversation,
                     contact.getName()
                             .concat("  ¡Gracias!\n")
                             .concat(
@@ -941,84 +1224,77 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     
     private void sendAutomaticMessage(
             Contact contact,
+            Conversation conversation,
             String message) {
 
-        if (contact == null) {
+        if (contact == null || conversation == null
+                || message == null || message.isBlank()) {
             return;
         }
 
-        if (message == null || message.isBlank()) {
+        if (conversation.getStatus() != ConversationStatus.BOT) {
             return;
         }
 
-        /*
-         * Zona horaria oficial de la empresa.
-         *
-         * Esto evita depender de la zona horaria configurada
-         * en el servidor donde esté desplegado Spring Boot.
-         */
+        if (contact.getPhone() == null || contact.getPhone().isBlank()) {
+            return;
+        }
+
         LocalTime currentTime =
-                LocalTime.now(
-                        ZoneId.of("America/Bogota")
-                );
+                LocalTime.now(ZoneId.of("America/Bogota"));
 
-        /*
-         * Horario de atención:
-         *
-         * Lunes a viernes:
-         * 07:00 incluido
-         * 17:00 excluido
-         *
-         * Actualmente solamente estamos controlando la hora.
-         */
-        LocalTime startTime =
-                LocalTime.of(7, 0);
-
-        LocalTime endTime =
-                LocalTime.of(17, 0);
+        LocalTime startTime = LocalTime.of(7, 0);
+        LocalTime endTime = LocalTime.of(17, 0);
 
         boolean withinBusinessHours =
                 !currentTime.isBefore(startTime)
                         && currentTime.isBefore(endTime);
 
-        /*
-         * Dentro del horario:
-         *
-         * Enviamos directamente el mensaje correspondiente
-         * al flujo actual.
-         */
-        if (withinBusinessHours) {
+        String messageToSend = message;
 
-            this.whatsappResponseAutimatics.sendText(
-                    contact.getPhone(),
-                    message
-            );
-
-            return;
+        if (!withinBusinessHours) {
+            messageToSend =
+                    "Gracias por comunicarte con Neumática Industrial.\n"
+                    + "En este momento nuestro equipo se encuentra fuera del horario de atención. "
+                    + "Hemos recibido tu mensaje y uno de nuestros asesores te responderá a primera hora del siguiente día hábil.\n"
+                    + "Agradecemos tu confianza.";
         }
-
-        /*
-         * Fuera del horario:
-         *
-         * No enviamos el mensaje específico del flujo.
-         * En su lugar enviamos el mensaje general indicando
-         * que la empresa está fuera de horario.
-         */
-        String outOfHoursMessage =
-                "Gracias por comunicarte con Neumática Industrial.\n"
-                .concat(
-                        "En este momento nuestro equipo se encuentra fuera del horario de atención. "
-                )
-                .concat(
-                        "Hemos recibido tu mensaje y uno de nuestros asesores te responderá a primera hora del siguiente día hábil.\n"
-                )
-                .concat(
-                        "Agradecemos tu confianza."
-                );
 
         this.whatsappResponseAutimatics.sendText(
                 contact.getPhone(),
-                outOfHoursMessage
+                messageToSend
+        );
+
+        LocalDateTime now =
+                LocalDateTime.now(ZoneId.of("America/Bogota"));
+
+        Message automaticMessage =
+                Message.builder()
+                        .whatsappMessageId(null)
+                        .conversation(conversation)
+                        .direction(Direction.OUTGOING)
+                        .senderUserId(null)
+                        .type(MessageType.TEXT)
+                        .body(messageToSend)
+                        .createdAt(now)
+                        .whatsappTimestamp(
+                                now.atZone(ZoneId.of("America/Bogota"))
+                                        .toEpochSecond()
+                        )
+                        .build();
+
+        conversation.addMessage(automaticMessage);
+        conversation.setLastMessageAt(now);
+        this.conversationRepository.save(conversation);
+
+        this.notificationService.sendConversationMessageAfterCommit(
+                conversation.getId(),
+                automaticMessage
+        );
+
+        this.notificationService.sendConversationSummaryAfterCommit(
+                conversation,
+                automaticMessage
         );
     }
 
@@ -1043,60 +1319,174 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     public void delete(UUID id) {
 
         /*
-         * Buscamos el contacto junto con sus conversaciones y mensajes
-         * para poder identificar los archivos multimedia asociados.
+         * ============================================================
+         * 1. BUSCAR EL CONTACTO
+         * ============================================================
          */
-        Contact contact =
-                this.contactRepository
-                        .findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Contacto no encontrado."
-                                )
+
+        Contact contact = this.contactRepository
+                .findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Contacto no encontrado."
+                        )
+                );
+
+
+        /*
+         * ============================================================
+         * 2. OBTENER LAS CONVERSACIONES
+         * ============================================================
+         *
+         * Creamos una copia de la colección para evitar problemas
+         * si Hibernate modifica la colección durante la eliminación.
+         */
+
+        List<Conversation> conversations =
+                contact.getConversations() == null
+                        ? List.of()
+                        : List.copyOf(
+                                contact.getConversations()
                         );
 
-        /*
-         * Recorremos todas las conversaciones del contacto.
-         */
-        if (contact.getConversations() != null) {
 
-            contact.getConversations()
-                    .forEach(conversation -> {
+        /*
+         * ============================================================
+         * 3. RECORRER LAS CONVERSACIONES
+         * ============================================================
+         */
+
+        for (Conversation conversation : conversations) {
+
+            if (conversation == null) {
+                continue;
+            }
+
+
+            /*
+             * ========================================================
+             * 4. OBTENER LOS MENSAJES
+             * ========================================================
+             */
+
+            List<Message> messages =
+                    conversation.getMessages() == null
+                            ? List.of()
+                            : List.copyOf(
+                                    conversation.getMessages()
+                            );
+
+
+            /*
+             * ========================================================
+             * 5. ELIMINAR ARCHIVOS MULTIMEDIA FÍSICOS
+             * ========================================================
+             *
+             * La base de datos solamente guarda la referencia
+             * (storagePath).
+             *
+             * Por eso debemos eliminar también el archivo físico.
+             */
+
+            for (Message message : messages) {
+
+                if (message == null) {
+                    continue;
+                }
+
+                String storagePath =
+                        message.getStoragePath();
+
+
+                if (storagePath != null
+                        && !storagePath.isBlank()) {
+
+                    try {
+
+                        this.mediaStorageServiceImpl.delete(
+                                storagePath
+                        );
+
+                    } catch (Exception e) {
 
                         /*
-                         * Recorremos todos los mensajes de la conversación.
+                         * Si el archivo físico ya no existe
+                         * o Storage presenta algún problema,
+                         * no detenemos la eliminación de la BD.
                          */
-                        if (conversation.getMessages() != null) {
 
-                            conversation.getMessages()
-                                    .forEach(message -> {
+                        System.err.println(
+                                "No fue posible eliminar el archivo multimedia: "
+                                        + storagePath
+                        );
 
-                                        /*
-                                         * Si el mensaje tiene un archivo
-                                         * multimedia almacenado, lo eliminamos
-                                         * físicamente del servidor.
-                                         */
-                                        if (message.getStoragePath() != null
-                                                && !message.getStoragePath().isBlank()) {
+                        System.err.println(
+                                "Detalle: "
+                                        + e.getMessage()
+                        );
+                    }
+                }
+            }
 
-                                            this.mediaStorageServiceImpl
-                                                    .delete(
-                                                            message.getStoragePath()
-                                                    );
-                                        }
-                                    });
-                        }
-                    });
+
+            /*
+             * ========================================================
+             * 6. ELIMINAR MENSAJES DE LA BASE DE DATOS
+             * ========================================================
+             *
+             * Se eliminan primero los mensajes porque dependen
+             * de la conversación.
+             */
+
+            if (!messages.isEmpty()) {
+
+                this.messageRepository.deleteAll(
+                        messages
+                );
+            }
+
+
+            /*
+             * ========================================================
+             * 7. ELIMINAR LA CONVERSACIÓN
+             * ========================================================
+             */
+
+            this.conversationRepository.delete(
+                    conversation
+            );
         }
 
+
         /*
-         * Finalmente eliminamos el contacto.
+         * ============================================================
+         * 8. ELIMINAR EL CONTACTO
+         * ============================================================
          *
-         * Debido al cascade configurado en Contact -> Conversation
-         * y Conversation -> Message, las conversaciones y mensajes
-         * asociados también serán eliminados de la base de datos.
+         * En este punto:
+         *
+         * Contacto
+         *    └── Conversaciones
+         *          └── Mensajes
+         *
+         * ya fueron procesados.
          */
-        this.contactRepository.delete(contact);
+
+        this.contactRepository.delete(
+                contact
+        );
+
+
+        /*
+         * ============================================================
+         * 9. FORZAR LA EJECUCIÓN DE LAS OPERACIONES
+         * ============================================================
+         *
+         * Esto permite detectar inmediatamente cualquier problema
+         * de integridad referencial antes de finalizar la transacción.
+         */
+
+        this.contactRepository.flush();
     }
 
 }

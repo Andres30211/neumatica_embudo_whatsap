@@ -7,6 +7,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.neumatica.embudo.whatsap.dto.contact.ConversationSummaryResponse;
 import com.neumatica.embudo.whatsap.dto.webhook.MessageDto;
 import com.neumatica.embudo.whatsap.dto.webhook.WhatsappWebHookDto;
 import com.neumatica.embudo.whatsap.entitys.Contact;
@@ -24,7 +28,10 @@ import com.neumatica.embudo.whatsap.repository.WhatsappWebhookService;
 import com.neumatica.embudo.whatsap.services.ExcelExportServices;
 import com.neumatica.embudo.whatsap.services.WhatsappWebhookServiceImpl;
 
+import lombok.RequiredArgsConstructor;
+
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/webhook")
 @CrossOrigin(origins = {"http://localhost:4200", "https://neumatica-crm.netlify.app/"})
 public class WebhookMetaController {
@@ -38,22 +45,41 @@ public class WebhookMetaController {
 	@Autowired
 	private ExcelExportServices excelExportServices;
 	
+	private final ObjectMapper objectMapper;
+	
 	@DeleteMapping("/delete/{id}")
 	public void delete(@PathVariable("id") UUID id){
 		this.whatsappWebhookService.delete(id);
 	}
 	
 	@GetMapping("/contacts")
-	public ResponseEntity<Page<Contact>> contacts(@RequestParam(defaultValue = "0") int page) {
-		
-	    return ResponseEntity.ok(this.whatsappWebhookService.contacts(page));
+	public ResponseEntity<Page<ConversationSummaryResponse>> contacts(
+
+	        @RequestParam(defaultValue = "0") int page,
+
+	        @AuthenticationPrincipal Jwt jwt
+	) {
+
+	    if (jwt == null) {
+
+	        throw new RuntimeException(
+	                "JWT no disponible."
+	        );
+	    }
+
+	    String accessToken =
+	            jwt.getTokenValue();
+
+	    Page<ConversationSummaryResponse> conversations =
+	            this.whatsappWebhookService.contacts(
+	                    page,
+	                    accessToken
+	            );
+
+	    return ResponseEntity.ok(
+	            conversations
+	    );
 	}
-	
-	/*@PostMapping
-    public void webhook(@RequestBody WhatsappWebHookDto json) {
-		
-		System.out.println(json);
-    }*/
 	
 	@PostMapping
     public ResponseEntity<String> webhook(@RequestBody WhatsappWebHookDto webhook) {

@@ -6,6 +6,7 @@ import com.neumatica.embudo.whatsap.dto.webhook.MessageDto;
 import com.neumatica.embudo.whatsap.entitys.Conversation;
 import com.neumatica.embudo.whatsap.entitys.Message;
 import com.neumatica.embudo.whatsap.mapper.MessageMapper;
+import com.neumatica.embudo.whatsap.repository.ConversationRepository;
 import com.neumatica.embudo.whatsap.repository.MediaStorageService;
 import com.neumatica.embudo.whatsap.repository.MessageRepository;
 
@@ -13,7 +14,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/*
+
+/**
  * Servicio encargado de procesar los mensajes recibidos
  * desde WhatsApp.
  */
@@ -22,31 +24,30 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class MessageProcessingService {
 
+
     private final MessageMapper messageMapper;
 
     private final MediaStorageService mediaStorageService;
 
     private final MessageRepository messageRepository;
 
-    /*
-     * Procesa completamente un mensaje recibido.
-     *
-     * <p>El flujo es:
-     *
-     * <ol>
-     *     <li>Validar el mensaje.</li>
-     *     <li>Evitar duplicados.</li>
-     *     <li>Convertir DTO a entidad.</li>
-     *     <li>Detectar multimedia.</li>
-     *     <li>Descargar y almacenar multimedia.</li>
-     *     <li>Asociar el mensaje a la conversación.</li>
-     *     <li>Persistir el mensaje.</li>
-     * </ol>
+    private final ConversationRepository conversationRepository;
+
+
+    /**
+     * Procesa completamente un mensaje recibido
+     * desde WhatsApp.
      */
     @Transactional
     public Message process(
             MessageDto dto,
-            Conversation conversation) {
+            Conversation conversation
+    ) {
+
+
+        // =====================================================
+        // 1. VALIDACIONES
+        // =====================================================
 
         if (dto == null) {
 
@@ -55,6 +56,7 @@ public class MessageProcessingService {
             );
         }
 
+
         if (conversation == null) {
 
             throw new IllegalArgumentException(
@@ -62,20 +64,25 @@ public class MessageProcessingService {
             );
         }
 
-        /*
-         * Evitamos procesar nuevamente un mensaje
-         * que ya fue almacenado.
-         */
-        if (dto.getId() != null
-                && messageRepository
+
+        // =====================================================
+        // 2. EVITAR DUPLICADOS
+        // =====================================================
+
+        if (
+                dto.getId() != null
+                &&
+                messageRepository
                         .existsByWhatsappMessageId(
                                 dto.getId()
-                        )) {
+                        )
+        ) {
 
             log.info(
                     "Mensaje ya procesado. whatsappMessageId={}",
                     dto.getId()
             );
+
 
             return messageRepository
                     .findByWhatsappMessageId(
@@ -84,19 +91,26 @@ public class MessageProcessingService {
                     .orElse(null);
         }
 
-        /*
-         * Convertimos el DTO recibido desde WhatsApp
-         * en nuestra entidad.
-         */
+
+        // =====================================================
+        // 3. CONVERTIR DTO → ENTITY
+        // =====================================================
+
         Message message =
                 messageMapper.toEntity(
                         dto
                 );
 
-        /*
-         * Determinamos si existe multimedia.
-         */
-        if (hasMedia(message)) {
+
+        // =====================================================
+        // 4. MULTIMEDIA
+        // =====================================================
+
+        if (
+                hasMedia(
+                        message
+                )
+        ) {
 
             log.info(
                     "Mensaje multimedia detectado. mediaId={}, type={}",
@@ -104,61 +118,91 @@ public class MessageProcessingService {
                     message.getType()
             );
 
-            /*
-             * Descargamos el archivo y obtenemos
-             * la ruta lógica de almacenamiento.
-             */
-            String storagePath =
-                    mediaStorageService.downloadAndStore(
-                            message.getMediaId(),
-                            message.getMimeType(),
-                            message.getSha256()
-                    );
 
-            /*
-             * Guardamos solamente la referencia
-             * al archivo físico.
-             */
+            String storagePath =
+                    mediaStorageService
+                            .downloadAndStore(
+                                    message.getMediaId(),
+                                    message.getMimeType(),
+                                    message.getSha256()
+                            );
+
+
             message.setStoragePath(
                     storagePath
             );
         }
 
-        /*
-         * Asociamos el mensaje a la conversación.
-         *
-         * addMessage() configura también:
-         *
-         * message.setConversation(this)
-         */
+
+        // =====================================================
+        // 5. ASOCIAR MENSAJE A LA CONVERSACIÓN
+        // =====================================================
+
         conversation.addMessage(
                 message
         );
 
-        /*
-         * Persistimos el mensaje.
-         */
+
+        // =====================================================
+        // 6. GUARDAR MENSAJE
+        // =====================================================
+
         Message savedMessage =
                 messageRepository.save(
                         message
                 );
 
-        log.info(
-                "Mensaje guardado correctamente. id={}, whatsappMessageId={}",
-                savedMessage.getId(),
-                savedMessage.getWhatsappMessageId()
+
+        // =====================================================
+        // 7. ACTUALIZAR ACTIVIDAD DE LA CONVERSACIÓN
+        // =====================================================
+
+        /*
+         * La fecha utilizada para ordenar las conversaciones
+         * debe provenir del mensaje realmente almacenado.
+         */
+        conversation.setLastMessageAt(
+                savedMessage.getCreatedAt()
         );
+
+
+        // =====================================================
+        // 8. PERSISTIR CONVERSACIÓN
+        // =====================================================
+
+        conversationRepository.save(
+                conversation
+        );
+
+
+        // =====================================================
+        // 9. LOG
+        // =====================================================
+
+        log.info(
+                "Mensaje guardado correctamente. " +
+                "id={}, whatsappMessageId={}, conversationId={}, lastMessageAt={}",
+                savedMessage.getId(),
+                savedMessage.getWhatsappMessageId(),
+                conversation.getId(),
+                conversation.getLastMessageAt()
+        );
+
 
         return savedMessage;
     }
+
 
     /**
      * Determina si el mensaje contiene multimedia.
      */
     private boolean hasMedia(
-            Message message) {
+            Message message
+    ) {
 
         return message.getMediaId() != null
-                && !message.getMediaId().isBlank();
+                &&
+                !message.getMediaId().isBlank();
     }
+
 }
