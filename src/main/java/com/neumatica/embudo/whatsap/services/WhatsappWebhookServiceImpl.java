@@ -1124,19 +1124,23 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     public void processEmailAndCompany(
             Contact contact,
             Conversation conversation,
-            MessageDto messageDTO) {
+            MessageDto messageDTO
+    ) {
 
         if (contact == null || messageDTO == null) {
             return;
         }
 
         /*
-         * Esta etapa del flujo espera que el contacto envíe:
+         * Esta etapa espera:
          *
          * correo electrónico
          * nombre de la empresa
          *
-         * Por lo tanto, solamente debemos procesar mensajes de tipo TEXT.
+         * Se aceptan ambos órdenes:
+         *
+         * correo + empresa
+         * empresa + correo
          */
         if (!"text".equalsIgnoreCase(messageDTO.getType())) {
             return;
@@ -1145,20 +1149,21 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
         if (messageDTO.getText() == null
                 || messageDTO.getText().getBody() == null
                 || messageDTO.getText().getBody().isBlank()) {
+
             return;
         }
 
         Pattern pattern = Pattern.compile(
-        		"^\\s*(?:" +
-        		        "(?<email>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})" +
-        		        "[\\s,;:\\-]+" +
-        		        "(?<company>.+?)" +
-        		    "|" +
-        		        "(?<companyFirst>.+?)" +
-        		        "[\\s,;:\\-]+" +
-        		        "(?<emailSecond>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})" +
-        		    ")\\s*$",
-        		    Pattern.CASE_INSENSITIVE | Pattern.DOTALL
+                "^\\s*(?:"
+                        + "(?<email>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+                        + "[\\s,;:\\-]+"
+                        + "(?<company>.+?)"
+                        + "|"
+                        + "(?<companyFirst>.+?)"
+                        + "[\\s,;:\\-]+"
+                        + "(?<emailSecond>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})"
+                        + ")\\s*$",
+                Pattern.CASE_INSENSITIVE | Pattern.DOTALL
         );
 
         Matcher matcher =
@@ -1166,59 +1171,85 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
                         messageDTO.getText().getBody()
                 );
 
-        if (matcher.find()) {
+        if (!matcher.matches()) {
+            return;
+        }
 
-            String email = matcher.group(1);
-            String company = matcher.group(2);
+        String email;
+        String company;
 
-            contact.setEmail(email);
-            contact.setCompany(company);
-            contact.setRegistrationStep(
-                    RegistrationStep.COMPLETED
-            );
+        if (matcher.group("email") != null) {
 
-            sendAutomaticMessage(
-                    contact,
-                    conversation,
-                    contact.getName()
-                            .concat("  ¡Gracias!\n")
-                            .concat(
-                                    "Hemos recibido tu información correctamente."
-                            )
-                            .concat(
-                                    "En este momento estamos asignando un asesor especializado, "
-                                    + "quien se pondrá en contacto contigo lo antes posible.\n"
-                            )
-                            .concat(
-                                    "Agradecemos la confianza depositada en Neumática Industrial. "
-                                    + "Estamos comprometidos con brindarte soluciones que impulsen "
-                                    + "la productividad y eficiencia de tu empresa."
-                            )
-            );
+            email =
+                    matcher.group("email").trim();
 
-            EmailRequestDto emailRequestDto =
-                    new EmailRequestDto(
-                            contact.getEmail(),
-                            contact.getName(),
-                            contact.getCompany()
-                    );
+            company =
+                    matcher.group("company").trim();
 
-            try {
+        } else {
 
-                this.brevoEmailServices.sendEmail(
-                        emailRequestDto,
-                        4L
+            email =
+                    matcher.group("emailSecond").trim();
+
+            company =
+                    matcher.group("companyFirst").trim();
+        }
+
+        contact.setEmail(email);
+
+        contact.setCompany(company);
+
+        contact.setRegistrationStep(
+                RegistrationStep.COMPLETED
+        );
+
+        /*
+         * Guardamos primero la información
+         * capturada del contacto.
+         */
+        contactRepository.save(contact);
+
+        sendAutomaticMessage(
+                contact,
+                conversation,
+                contact.getName()
+                        .concat("  ¡Gracias!\n")
+                        .concat(
+                                "Hemos recibido tu información correctamente."
+                        )
+                        .concat(
+                                "En este momento estamos asignando un asesor especializado, "
+                                        + "quien se pondrá en contacto contigo lo antes posible.\n"
+                        )
+                        .concat(
+                                "Agradecemos la confianza depositada en Neumática Industrial. "
+                                        + "Estamos comprometidos con brindarte soluciones que impulsen "
+                                        + "la productividad y eficiencia de tu empresa."
+                        )
+        );
+
+        EmailRequestDto emailRequestDto =
+                new EmailRequestDto(
+                        email,
+                        contact.getName(),
+                        company
                 );
 
-            } catch (Exception e) {
+        try {
 
-                e.printStackTrace();
-            }
+            this.brevoEmailServices.sendEmail(
+                    emailRequestDto,
+                    4L
+            );
 
-            contactRepository.save(contact);
+        } catch (Exception e) {
 
-            this.notificationService.sendNewContact(contact);
+            e.printStackTrace();
         }
+
+        this.notificationService.sendNewContact(
+                contact
+        );
     }
     
     
