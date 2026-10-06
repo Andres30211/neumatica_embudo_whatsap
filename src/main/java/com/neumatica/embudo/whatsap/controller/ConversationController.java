@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.neumatica.embudo.whatsap.dto.user.SendMessageRequest;
 import com.neumatica.embudo.whatsap.entitys.Conversation;
@@ -95,6 +97,52 @@ public class ConversationController {
                 );
 
         return ResponseEntity.ok(message);
+    }
+    
+    /**
+     * ============================================================
+     * ENVIAR ARCHIVO / MULTIMEDIA
+     * ============================================================
+     */
+    @PostMapping(
+            value = "/{conversationId}/media",
+            consumes = "multipart/form-data"
+    )
+    public ResponseEntity<Message> sendMedia(
+
+            @PathVariable UUID conversationId,
+
+            @RequestParam("file")
+            MultipartFile file,
+
+            @RequestParam(
+                    value = "caption",
+                    required = false
+            )
+            String caption,
+
+            @AuthenticationPrincipal Jwt jwt
+
+    ) {
+
+        UUID userId =
+                getUserIdFromJwt(jwt);
+
+        String accessToken =
+                jwt.getTokenValue();
+
+        Message message =
+                manualMessageService.sendMedia(
+                        conversationId,
+                        userId,
+                        file,
+                        caption,
+                        accessToken
+                );
+
+        return ResponseEntity.ok(
+                message
+        );
     }
 
 
