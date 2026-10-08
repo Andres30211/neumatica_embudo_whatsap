@@ -33,7 +33,6 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/webhook")
-@CrossOrigin(origins = {"http://localhost:4200", "https://neumatica-crm.netlify.app/"})
 public class WebhookMetaController {
 	
 	@Autowired

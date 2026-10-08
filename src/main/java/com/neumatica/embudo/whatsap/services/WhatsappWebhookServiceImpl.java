@@ -1337,7 +1337,7 @@ public class WhatsappWebhookServiceImpl implements  WhatsappWebhookService{
     	
     	emails.forEach(contact ->{
     			try {
-    				this.brevoEmailServices.sendEmail(new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany()), 4L);
+    				this.brevoEmailServices.sendEmail(new EmailRequestDto(contact.getEmail(), contact.getName(), contact.getCompany()), 5L);
 				} catch (Exception e) {
 					System.out.println("Error enviado a: ".concat(contact.getEmail()));
 				}

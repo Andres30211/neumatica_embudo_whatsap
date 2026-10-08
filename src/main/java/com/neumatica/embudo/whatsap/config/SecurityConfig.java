@@ -6,6 +6,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -25,7 +27,6 @@ public class SecurityConfig {
                  */
                 .cors(Customizer.withDefaults())
 
-
                 /*
                  * ====================================================
                  * CSRF
@@ -33,20 +34,16 @@ public class SecurityConfig {
                  */
                 .csrf(csrf -> csrf.disable())
 
-
                 /*
                  * ====================================================
                  * SESIONES
                  * ====================================================
-                 *
-                 * API completamente stateless.
                  */
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
-
 
                 /*
                  * ====================================================
@@ -56,66 +53,50 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         /*
-                         * ------------------------------------------------
                          * WEBHOOK WHATSAPP / META
-                         * ------------------------------------------------
                          */
                         .requestMatchers(
                                 "/webhook/**"
                         ).permitAll()
 
-
                         /*
-                         * ------------------------------------------------
                          * WEBSOCKET
-                         * ------------------------------------------------
-                         *
-                         * IMPORTANTE:
-                         *
-                         * El handshake inicial del WebSocket debe poder
-                         * realizarse sin JWT HTTP.
-                         *
-                         * La autenticación STOMP puede realizarse
-                         * posteriormente en el frame CONNECT.
                          */
                         .requestMatchers(
                                 "/wss",
                                 "/wss/**"
                         ).permitAll()
 
-
                         /*
-                         * ------------------------------------------------
                          * CORS / PREFLIGHT
-                         * ------------------------------------------------
                          */
                         .requestMatchers(
                                 HttpMethod.OPTIONS,
                                 "/**"
                         ).permitAll()
 
-
                         /*
-                         * ------------------------------------------------
                          * REST API
-                         * ------------------------------------------------
-                         *
-                         * Las conversaciones siguen protegidas mediante
-                         * JWT.
                          */
                         .requestMatchers(
-                                "/api/conversations/**"
+                                "/api/conversations/**",
+                                "/api/contacts/getContacts",
+                                "/api/contacts/getContactById/**"
                         ).authenticated()
 
+                        /*
+                         * ADMIN
+                         */
+                        .requestMatchers(
+                                "/api/contacts/import",
+                                "/webhook/delete/**"
+                        ).hasRole("ADMIN")
 
                         /*
-                         * ------------------------------------------------
                          * RESTO DE LA APLICACIÓN
-                         * ------------------------------------------------
                          */
                         .anyRequest().authenticated()
                 )
-
 
                 /*
                  * ====================================================
@@ -123,11 +104,52 @@ public class SecurityConfig {
                  * ====================================================
                  */
                 .oauth2ResourceServer(
-                        oauth2 -> oauth2.jwt(
-                                Customizer.withDefaults()
-                        )
+                        oauth2 -> oauth2
+                                .jwt(jwt -> jwt
+                                        .jwtAuthenticationConverter(
+                                                jwtAuthenticationConverter()
+                                        )
+                                )
                 );
 
         return http.build();
+    }
+
+
+    /**
+     * Convierte el claim "roles" del JWT en authorities
+     * de Spring Security.
+     *
+     * JWT:
+     *
+     * "roles": [
+     *     "ROLE_ADMIN"
+     * ]
+     *
+     * Spring:
+     *
+     * ROLE_ADMIN
+     */
+    @Bean
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter =
+                new JwtGrantedAuthoritiesConverter();
+
+        // Claim personalizado de nuestro JWT
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles");
+
+        // El JWT ya trae ROLE_ADMIN, por lo tanto NO agregamos
+        // otro prefijo.
+        grantedAuthoritiesConverter.setAuthorityPrefix("");
+
+        JwtAuthenticationConverter jwtAuthenticationConverter =
+                new JwtAuthenticationConverter();
+
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(
+                grantedAuthoritiesConverter
+        );
+
+        return jwtAuthenticationConverter;
     }
 }

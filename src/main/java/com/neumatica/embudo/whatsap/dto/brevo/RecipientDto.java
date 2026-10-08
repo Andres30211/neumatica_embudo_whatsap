@@ -12,5 +12,4 @@ import lombok.Setter;
 public class RecipientDto {
 
 	private String email;
-    //private String name;
 }
