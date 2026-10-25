@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,57 +23,38 @@ import com.neumatica.embudo.whatsap.websocket.NotificationService;
 
 import jakarta.transaction.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Locale;
+
 @Service
 public class ManualMessageService {
 
-    private static final ZoneId ZONE_ID =
-            ZoneId.of("America/Bogota");
+    private static final ZoneId ZONE_ID = ZoneId.of("America/Bogota");
 
-    private final ConversationRepository
-            conversationRepository;
+    @Autowired
+    private ConversationRepository conversationRepository;
 
-    private final MessageRepository
-            messageRepository;
+    @Autowired
+    private MessageRepository messageRepository;
 
-    private final WhatsappResponseAutimatics
-            whatsappResponseAutimatics;
+    @Autowired
+    private WhatsappResponseAutimatics whatsappResponseAutimatics;
 
-    private final UserClientService
-            userClientService;
+    @Autowired
+    private UserClientService userClientService;
 
-    private final NotificationService
-            notificationService;
+    @Autowired
+    private NotificationService notificationService;
 
-    private final FileStorageService
-            fileStorageService;
+    @Autowired
+    private FileStorageService fileStorageService;
+    
+    @Autowired
+    private AudioConversionService audioConversionService;
 
-    public ManualMessageService(
-            ConversationRepository conversationRepository,
-            MessageRepository messageRepository,
-            WhatsappResponseAutimatics whatsappResponseAutimatics,
-            UserClientService userClientService,
-            NotificationService notificationService,
-            FileStorageService fileStorageService
-    ) {
-
-        this.conversationRepository =
-                conversationRepository;
-
-        this.messageRepository =
-                messageRepository;
-
-        this.whatsappResponseAutimatics =
-                whatsappResponseAutimatics;
-
-        this.userClientService =
-                userClientService;
-
-        this.notificationService =
-                notificationService;
-
-        this.fileStorageService =
-                fileStorageService;
-    }
+    public ManualMessageService() {}
 
     // ============================================================
     // ENVIAR MENSAJE DE TEXTO
@@ -200,278 +182,242 @@ public class ManualMessageService {
     // ENVIAR ARCHIVO / MULTIMEDIA
     // ============================================================
 
-    @Transactional
-    public Message sendMedia(
-            UUID conversationId,
-            UUID userId,
-            MultipartFile file,
-            String caption,
-            String accessToken
-    ) {
+    
+	@Transactional
+	public Message sendMedia(
+	        UUID conversationId,
+	        UUID userId,
+	        MultipartFile file,
+	        String caption,
+	        String accessToken
+	) {
+	
+	    validateBasicParameters(conversationId, userId, accessToken);
+	
+	    if (file == null || file.isEmpty()) {
+	        throw new IllegalArgumentException(
+	                "El archivo es obligatorio."
+	        );
+	    }
+	
+	    validateUser(userId, accessToken);
+	
+	    Conversation conversation = getConversation(conversationId);
+	
+	    validateConversationForManualMessage(conversation, userId);
+	
+	    Contact contact = getContact(conversation);
+	
+	    validatePhone(contact);
+	
+	    Path inputAudio = null;
+	    Path convertedAudio = null;
+	    StoredFile storedFile = null;
+	
+	    try {
+	        MultipartFile fileToProcess = file;
+	
+	        String contentType = file.getContentType() == null
+	                ? ""
+	                : file.getContentType().toLowerCase(Locale.ROOT);
+	
+	        String originalName = file.getOriginalFilename() == null
+	                ? ""
+	                : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+	
+	        boolean isWebmAudio =
+	                contentType.contains("webm")
+	                || originalName.endsWith(".webm");
+	
+	        // 1. Convertir WebM a OGG/Opus cuando sea necesario.
+	        if (isWebmAudio) {
+	            inputAudio = Files.createTempFile(
+	                    "incoming-audio-", ".webm"
+	            );
+	
+	            file.transferTo(inputAudio);
+	
+	            convertedAudio =
+	                    audioConversionService.convertWebmToOggOpus(
+	                            inputAudio
+	                    );
+	
+	            fileToProcess = new ConvertedAudioMultipartFile(
+	                    convertedAudio,
+	                    "audio.ogg"
+	            );
+	        }
+	
+	        // 2. Guardar el archivo que realmente vamos a enviar.
+	        storedFile = fileStorageService.store(
+	                fileToProcess,
+	                conversationId
+	        );
+	
+	        String mimeType = storedFile.getMimeType();
+	
+	        MessageType messageType;
+	
+	        if (mimeType != null
+	                && mimeType.toLowerCase(Locale.ROOT)
+	                        .startsWith("image/")) {
+	
+	            messageType = MessageType.IMAGE;
+	
+	        } else if (mimeType != null
+	                && mimeType.toLowerCase(Locale.ROOT)
+	                        .startsWith("audio/")) {
+	
+	            messageType = MessageType.AUDIO;
+	
+	        } else {
+	            messageType = MessageType.DOCUMENT;
+	        }
+	
+	        // 3. Subir el archivo a WhatsApp.
+	        String mediaId;
+	
+	        if (messageType == MessageType.AUDIO) {
+	            Path audioToUpload = convertedAudio;
+	
+	            if (audioToUpload != null) {
+	                mediaId = whatsappResponseAutimatics.uploadAudio(
+	                        audioToUpload,
+	                        "audio.ogg",
+	                        "audio/ogg"
+	                );
+	            } else {
+	                mediaId = whatsappResponseAutimatics.uploadMedia(
+	                        fileToProcess
+	                );
+	            }
+	        } else {
+	            mediaId = whatsappResponseAutimatics.uploadMedia(
+	                    fileToProcess
+	            );
+	        }
+	
+	        // 4. Enviar según el tipo de archivo.
+	        WhatsappSendResult sendResult;
+	
+	        if (messageType == MessageType.IMAGE) {
+	
+	            sendResult = whatsappResponseAutimatics.sendImage(
+	                    contact.getPhone(),
+	                    mediaId,
+	                    caption
+	            );
+	
+	        } else if (messageType == MessageType.AUDIO) {
+	
+	            sendResult = whatsappResponseAutimatics.sendAudio(
+	                    contact.getPhone(),
+	                    mediaId
+	            );
+	
+	        } else {
+	
+	            sendResult = whatsappResponseAutimatics.sendDocument(
+	                    contact.getPhone(),
+	                    mediaId,
+	                    caption,
+	                    storedFile.getOriginalFileName()
+	            );
+	        }
+	
+	        // 5. Crear el registro del mensaje.
+	        LocalDateTime now = LocalDateTime.now(ZONE_ID);
+	
+	        Message message = Message.builder()
+	                .whatsappMessageId(sendResult.getMessageId())
+	                .conversation(conversation)
+	                .direction(Direction.OUTGOING)
+	                .senderUserId(userId)
+	                .type(messageType)
+	                .body(null)
+	                .mediaId(mediaId)
+	                .storagePath(storedFile.getStoragePath())
+	                .mimeType(storedFile.getMimeType())
+	                .sha256(storedFile.getSha256())
+	                .caption(caption)
+	                .fileName(storedFile.getOriginalFileName())
+	                .createdAt(now)
+	                .whatsappTimestamp(
+	                        now.atZone(ZONE_ID).toEpochSecond()
+	                )
+	                .build();
+	
+	        // 6. Actualizar la conversación.
+	        conversation.addMessage(message);
+	        conversation.setLastMessageAt(now);
+	
+	        conversationRepository.save(conversation);
+	
+	        // 7. Notificar por WebSocket.
+	        notificationService.sendConversationMessageAfterCommit(
+	                conversation.getId(),
+	                message
+	        );
+	
+	        notificationService.sendConversationSummaryAfterCommit(
+	                conversation,
+	                message
+	        );
+	
+	        return message;
+	
+	    } catch (IOException e) {
+	
+	        deleteStoredFile(storedFile);
+	
+	        throw new RuntimeException(
+	                "Error procesando o convirtiendo el archivo multimedia.",
+	                e
+	        );
+	
+	    } catch (RuntimeException e) {
+	
+	        deleteStoredFile(storedFile);
+	
+	        throw e;
+	
+	    } finally {
+	
+	        try {
+	            if (inputAudio != null) {
+	                Files.deleteIfExists(inputAudio);
+	            }
+	
+	            if (convertedAudio != null) {
+	                Files.deleteIfExists(convertedAudio);
+	            }
+	        } catch (IOException e) {
+	            System.err.println(
+	                    "No se pudieron eliminar los archivos temporales: "
+	                            + e.getMessage()
+	            );
+	        }
+	    }
+	}
+	
 
-        validateBasicParameters(
-                conversationId,
-                userId,
-                accessToken
-        );
+	private void deleteStoredFile(StoredFile storedFile) {
+	    if (storedFile != null
+	            && storedFile.getStoragePath() != null) {
+	        try {
+	            fileStorageService.delete(
+	                    storedFile.getStoragePath()
+	            );
+	        } catch (RuntimeException e) {
+	            System.err.println(
+	                    "No se pudo eliminar el archivo almacenado: "
+	                            + e.getMessage()
+	            );
+	        }
+	    }
+	}
 
-        if (
-                file == null
-                        || file.isEmpty()
-        ) {
 
-            throw new IllegalArgumentException(
-                    "El archivo es obligatorio."
-            );
-        }
-
-        validateUser(
-                userId,
-                accessToken
-        );
-
-        Conversation conversation =
-                getConversation(
-                        conversationId
-                );
-
-        validateConversationForManualMessage(
-                conversation,
-                userId
-        );
-
-        Contact contact =
-                getContact(conversation);
-
-        validatePhone(contact);
-
-        /*
-         * --------------------------------------------------------
-         * 1. GUARDAMOS EL ARCHIVO EN NUESTRO SISTEMA
-         * --------------------------------------------------------
-         */
-
-        StoredFile storedFile =
-                fileStorageService.store(
-                        file,
-                        conversationId
-                );
-
-        try {
-
-            /*
-             * ----------------------------------------------------
-             * 2. DETERMINAMOS EL TIPO
-             * ----------------------------------------------------
-             */
-
-            String mimeType =
-                    storedFile.getMimeType();
-
-            MessageType messageType;
-
-            if (
-                    mimeType != null
-                            && mimeType
-                            .toLowerCase()
-                            .startsWith("image/")
-            ) {
-
-                messageType =
-                        MessageType.IMAGE;
-
-            } else {
-
-                /*
-                 * PDF, Word, Excel, ZIP, etc.
-                 * se manejarán como DOCUMENT.
-                 */
-
-                messageType =
-                        MessageType.DOCUMENT;
-            }
-
-            /*
-             * ----------------------------------------------------
-             * 3. SUBIMOS EL ARCHIVO A WHATSAPP
-             * ----------------------------------------------------
-             */
-
-            String mediaId =
-                    whatsappResponseAutimatics
-                            .uploadMedia(file);
-
-            /*
-             * ----------------------------------------------------
-             * 4. ENVIAMOS EL MEDIA AL CONTACTO
-             * ----------------------------------------------------
-             */
-
-            WhatsappSendResult sendResult;
-
-            if (
-                    messageType
-                            == MessageType.IMAGE
-            ) {
-
-                sendResult =
-                        whatsappResponseAutimatics
-                                .sendImage(
-                                        contact.getPhone(),
-                                        mediaId,
-                                        caption
-                                );
-
-            } else {
-
-                sendResult =
-                        whatsappResponseAutimatics
-                                .sendDocument(
-                                        contact.getPhone(),
-                                        mediaId,
-                                        caption,
-                                        storedFile
-                                                .getOriginalFileName()
-                                );
-            }
-
-            /*
-             * ----------------------------------------------------
-             * 5. CREAMOS EL MENSAJE
-             * ----------------------------------------------------
-             */
-
-            LocalDateTime now =
-                    LocalDateTime.now(
-                            ZONE_ID
-                    );
-
-            Message message =
-                    Message.builder()
-
-                            .whatsappMessageId(
-                                    sendResult
-                                            .getMessageId()
-                            )
-
-                            .conversation(
-                                    conversation
-                            )
-
-                            .direction(
-                                    Direction.OUTGOING
-                            )
-
-                            .senderUserId(
-                                    userId
-                            )
-
-                            .type(
-                                    messageType
-                            )
-
-                            .body(
-                                    null
-                            )
-
-                            .mediaId(
-                                    mediaId
-                            )
-
-                            .storagePath(
-                                    storedFile
-                                            .getStoragePath()
-                            )
-
-                            .mimeType(
-                                    storedFile
-                                            .getMimeType()
-                            )
-
-                            .sha256(
-                                    storedFile
-                                            .getSha256()
-                            )
-
-                            .caption(
-                                    caption
-                            )
-
-                            .fileName(
-                                    storedFile
-                                            .getOriginalFileName()
-                            )
-
-                            .createdAt(
-                                    now
-                            )
-
-                            .whatsappTimestamp(
-                                    now.atZone(
-                                            ZONE_ID
-                                    ).toEpochSecond()
-                            )
-
-                            .build();
-
-            /*
-             * ----------------------------------------------------
-             * 6. AGREGAMOS EL MENSAJE A LA CONVERSACIÓN
-             * ----------------------------------------------------
-             */
-
-            conversation.addMessage(
-                    message
-            );
-
-            conversation.setLastMessageAt(
-                    now
-            );
-
-            /*
-             * ----------------------------------------------------
-             * 7. GUARDAMOS
-             * ----------------------------------------------------
-             */
-
-            conversationRepository.save(
-                    conversation
-            );
-
-            /*
-             * ----------------------------------------------------
-             * 8. WEBSOCKET
-             * ----------------------------------------------------
-             */
-
-            notificationService
-                    .sendConversationMessageAfterCommit(
-                            conversation.getId(),
-                            message
-                    );
-
-            notificationService
-                    .sendConversationSummaryAfterCommit(
-                            conversation,
-                            message
-                    );
-
-            return message;
-
-        } catch (RuntimeException e) {
-
-            /*
-             * Si WhatsApp falla, eliminamos el archivo
-             * que acabamos de guardar localmente.
-             */
-
-            fileStorageService.delete(
-                    storedFile.getStoragePath()
-            );
-
-            throw e;
-        }
-    }
 
     // ============================================================
     // VALIDACIONES

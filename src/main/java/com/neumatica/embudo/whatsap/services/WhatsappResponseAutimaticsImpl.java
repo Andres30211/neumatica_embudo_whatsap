@@ -1,5 +1,7 @@
 package com.neumatica.embudo.whatsap.services;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -20,8 +22,7 @@ import com.neumatica.embudo.whatsap.dto.media.WhatsappSendResult;
 import com.neumatica.embudo.whatsap.repository.WhatsappResponseAutimatics;
 
 @Service
-public class WhatsappResponseAutimaticsImpl
-        implements WhatsappResponseAutimatics {
+public class WhatsappResponseAutimaticsImpl implements WhatsappResponseAutimatics {
 
     private final RestClient restClient;
 
@@ -244,6 +245,108 @@ public class WhatsappResponseAutimaticsImpl
             );
         }
     }
+    
+
+    // ============================================================
+    // SUBIR AUDIO OGG/OPUS A WHATSAPP
+    // ============================================================
+
+    @Override
+    public String uploadAudio(
+            Path audioPath,
+            String fileName,
+            String mimeType
+    ) {
+
+        if (audioPath == null || !Files.isRegularFile(audioPath)) {
+            throw new IllegalArgumentException(
+                    "El archivo de audio no existe."
+            );
+        }
+
+        String url =
+                "https://graph.facebook.com/"
+                        + graphApiVersion
+                        + "/"
+                        + phoneNumberId
+                        + "/media";
+
+        try {
+            byte[] bytes = Files.readAllBytes(audioPath);
+
+            ByteArrayResource resource = new ByteArrayResource(bytes) {
+                @Override
+                public String getFilename() {
+                    return fileName;
+                }
+            };
+
+            MultiValueMap<String, Object> body =
+                    new LinkedMultiValueMap<>();
+
+            body.add("messaging_product", "whatsapp");
+            body.add("file", resource);
+            body.add("type", mimeType);
+
+            ResponseEntity<String> response = restClient.post()
+                    .uri(url)
+                    .header(
+                            HttpHeaders.AUTHORIZATION,
+                            "Bearer " + accessToken
+                    )
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(body)
+                    .retrieve()
+                    .toEntity(String.class);
+
+            JsonNode json = objectMapper.readTree(response.getBody());
+            JsonNode idNode = json.get("id");
+
+            if (idNode == null || idNode.asText().isBlank()) {
+                throw new RuntimeException(
+                        "WhatsApp no devolvió el mediaId del audio."
+                );
+            }
+
+            return idNode.asText();
+
+        } catch (RestClientResponseException e) {
+            logMetaError("ERROR SUBIENDO AUDIO", e);
+            throw e;
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Error subiendo audio OGG/Opus a WhatsApp.",
+                    e
+            );
+        }
+    }
+
+
+    // ============================================================
+    // ENVIAR NOTA DE VOZ
+    // ============================================================
+
+    @Override
+    public WhatsappSendResult sendAudio(
+            String to,
+            String mediaId
+    ) {
+
+        Map<String, Object> audio = new java.util.HashMap<>();
+        audio.put("id", mediaId);
+        audio.put("voice", true);
+
+        Map<String, Object> body = Map.of(
+                "messaging_product", "whatsapp",
+                "to", to,
+                "type", "audio",
+                "audio", audio
+        );
+
+        return sendMediaMessage(body, mediaId);
+    }
+
 
     // ============================================================
     // ENVIAR IMAGEN

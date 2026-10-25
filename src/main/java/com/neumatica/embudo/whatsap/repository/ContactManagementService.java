@@ -8,6 +8,8 @@ import org.springframework.data.domain.Pageable;
 import com.neumatica.embudo.whatsap.dto.contact.ContactResponse;
 
 public interface ContactManagementService {
+	
+	void delete(UUID string);
 
     Page<ContactResponse> getContacts(Pageable pageable);
 

@@ -36,6 +36,11 @@ public class ContactManagementController {
                 contactManagementService.getContacts(pageable)
         );
     }
+    
+    @DeleteMapping("/delete/{id}")
+	public void delete(@PathVariable("id") UUID id){
+		this.contactManagementService.delete(id);
+	}
 
     @GetMapping("/getContactById/{id}")
     public ResponseEntity<ContactResponse> getContactById(

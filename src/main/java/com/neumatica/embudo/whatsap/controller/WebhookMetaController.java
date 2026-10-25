@@ -46,10 +46,6 @@ public class WebhookMetaController {
 	
 	private final ObjectMapper objectMapper;
 	
-	@DeleteMapping("/delete/{id}")
-	public void delete(@PathVariable("id") UUID id){
-		this.whatsappWebhookService.delete(id);
-	}
 	
 	@GetMapping("/contacts")
 	public ResponseEntity<Page<ConversationSummaryResponse>> contacts(

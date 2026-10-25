@@ -10,8 +10,6 @@ import com.neumatica.embudo.whatsap.entitys.Contact;
 
 public interface WhatsappWebhookService {
 	
-	void delete(UUID id);
-	
 	Page<ConversationSummaryResponse> contacts(int page, String accessToken);
 
 	void processWebhook(WhatsappWebHookDto webhook);

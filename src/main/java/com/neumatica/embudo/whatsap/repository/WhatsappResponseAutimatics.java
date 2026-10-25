@@ -1,5 +1,7 @@
 package com.neumatica.embudo.whatsap.repository;
 
+import java.nio.file.Path;
+
 import org.springframework.web.multipart.MultipartFile;
 
 import com.neumatica.embudo.whatsap.dto.media.WhatsappSendResult;
@@ -24,4 +26,8 @@ public interface WhatsappResponseAutimatics {
             String caption,
             String fileName
     );
+    
+    String uploadAudio(Path audioPath, String fileName, String mimeType);
+
+    WhatsappSendResult sendAudio(String to, String mediaId);
 }
