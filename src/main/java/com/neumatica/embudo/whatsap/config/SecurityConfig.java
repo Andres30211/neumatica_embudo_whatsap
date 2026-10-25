@@ -80,8 +80,8 @@ public class SecurityConfig {
                          */
                         .requestMatchers(
                                 "/api/conversations/**",
-                                "/api/contacts/getContacts",
-                                "/api/contacts/getContactById/**"
+                                "/api/contacts/getContacts"
+                                
                         ).authenticated()
 
                         /*
@@ -89,7 +89,8 @@ public class SecurityConfig {
                          */
                         .requestMatchers(
                                 "/api/contacts/import",
-                                "/webhook/delete/**"
+                                "/api/contacts/getContactById/**",
+                                "/api/contacts/delete/**"
                         ).hasRole("ADMIN")
 
                         /*
