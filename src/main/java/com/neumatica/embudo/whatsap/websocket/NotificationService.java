@@ -67,47 +67,6 @@ public class NotificationService {
 
 
     // =========================================================
-    // NOTIFICACIÓN GENERAL
-    // =========================================================
-
-    /**
-     * Envía la notificación general que utiliza el CRM.
-     */
-    public void sendNotification(Contact contact) {
-
-        if (contact == null) {
-            return;
-        }
-
-        String contactName =
-                contact.getName();
-
-        if (contactName == null
-                || contactName.isBlank()) {
-
-            contactName = "Contacto";
-        }
-
-        Notification notification =
-                new Notification(
-                        UUID.randomUUID(),
-                        "NEW_WHATSAPP_MESSAGE",
-                        "Nuevo mensaje de WhatsApp",
-                        contactName
-                                + " ha enviado un mensaje",
-                        contact.getId(),
-                        LocalDateTime.now(ZONE_ID),
-                        false
-                );
-
-        messagingTemplate.convertAndSend(
-                "/topic/notifications",
-                notification
-        );
-    }
-
-
-    // =========================================================
     // MENSAJE DE CONVERSACIÓN
     // =========================================================
 
@@ -382,16 +341,9 @@ public class NotificationService {
      * Publica un resumen de conversación después
      * del COMMIT.
      */
-    public void sendConversationSummaryAfterCommit(
-            Conversation conversation,
-            Message lastMessage
-    ) {
+    public void sendConversationSummaryAfterCommit(Conversation conversation, Message lastMessage) {
 
-        sendConversationSummaryAfterCommit(
-                conversation,
-                lastMessage,
-                null
-        );
+        sendConversationSummaryAfterCommit(conversation, lastMessage, null);
     }
 
 
@@ -543,6 +495,9 @@ public class NotificationService {
 
                 .assignedUserName(
                         assignedUserName
+                )
+                .unreadCount(
+                        conversation.getUnreadCount()
                 )
 
                 .build();

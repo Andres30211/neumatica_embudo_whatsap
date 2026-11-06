@@ -28,4 +28,6 @@ public interface ConversationSummaryProjection {
     ConversationStatus getStatus();
 
     UUID getAssignedUserId();
+    
+    Integer getUnreadCount();
 }

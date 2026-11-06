@@ -62,6 +62,7 @@ public interface ConversationRepository
     	            x.last_message,
     	            x.last_message_type,
     	            x.last_message_at,
+    	            x.unread_count,
     	            x.status,
     	            x.assigned_user_id
     	        FROM (
@@ -77,6 +78,8 @@ public interface ConversationRepository
     	                m.created_at AS last_message_at,
 
     	                c.status AS status,
+    	                
+    	                c.unread_count AS unread_count,
 
     	                /*
     	                 * Vendedor asignado.

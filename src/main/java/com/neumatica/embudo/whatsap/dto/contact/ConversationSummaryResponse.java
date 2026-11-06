@@ -51,4 +51,6 @@ public class ConversationSummaryResponse {
      * Se obtiene desde el servicio de seguridad.
      */
     private String assignedUserName;
+    
+    private Integer unreadCount;
 }

@@ -14,6 +14,7 @@ import com.neumatica.embudo.whatsap.enums.ConversationStatus;
 import com.neumatica.embudo.whatsap.repository.ConversationRepository;
 import com.neumatica.embudo.whatsap.websocket.NotificationService;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 
 /**
@@ -400,5 +401,27 @@ public class ConversationAttentionService {
                             }
                         }
                 );
+    }
+    
+    @Transactional
+    public void markConversationAsRead(UUID conversationId) {
+
+        Conversation conversation = conversationRepository
+                .findById(conversationId).orElseThrow(() -> new EntityNotFoundException(
+                        "No se encontró la conversación: " + conversationId));
+
+        if (conversation.getUnreadCount() == null ||
+                conversation.getUnreadCount() == 0) {
+            return;
+        }
+
+        // Reiniciar contador de mensajes no leídos
+        conversation.setUnreadCount(0);
+
+        // Persistir el cambio
+        conversationRepository.save(conversation);
+
+        // Notificar a todos los clientes conectados
+        notificationService.sendConversationUpdateAfterCommit(conversation);
     }
 }

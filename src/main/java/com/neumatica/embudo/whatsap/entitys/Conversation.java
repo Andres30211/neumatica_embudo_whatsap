@@ -9,6 +9,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.neumatica.embudo.whatsap.enums.ConversationStatus;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -119,6 +120,13 @@ public class Conversation {
      */
     @Version
     private Long version;
+    
+    /*
+     * Cantidad de mensajes entrantes pendientes por leer.
+     */
+    @Builder.Default
+    @Column(nullable = false)
+    private Integer unreadCount = 0;
 
     /*
      * Agrega un mensaje manteniendo la relación bidireccional.
