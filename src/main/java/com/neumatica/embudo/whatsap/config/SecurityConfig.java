@@ -80,7 +80,8 @@ public class SecurityConfig {
                          */
                         .requestMatchers(
                                 "/api/conversations/**",
-                                "/api/contacts/getContacts"
+                                "/api/contacts/getContacts",
+                                "/api/push/subscriptions/**"
                                 
                         ).authenticated()
 
