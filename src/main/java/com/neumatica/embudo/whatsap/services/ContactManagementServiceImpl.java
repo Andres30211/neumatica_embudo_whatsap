@@ -26,92 +26,233 @@ import lombok.RequiredArgsConstructor;
 public class ContactManagementServiceImpl implements ContactManagementService {
 
 	@Autowired
-	private ContactRepository contactRepository;
-
+    private ContactRepository contactRepository;
+    
 	@Autowired
-	private MediaStorageServiceImpl mediaStorageServiceImpl;
-
+    private MediaStorageServiceImpl mediaStorageServiceImpl;
+	
 	@Autowired
 	private MessageRepository messageRepository;
-
+	
 	@Autowired
 	private ConversationRepository conversationRepository;
 
-	@Override
-	@Transactional(readOnly = true)
-	public Page<ContactResponse> getContacts(Pageable pageable) {
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ContactResponse> getContacts(Pageable pageable) {
 
-		return contactRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::toResponse);
-	}
+        return contactRepository
+                .findAllByOrderByCreatedAtDesc(pageable)
+                .map(this::toResponse);
+    }
 
-	@Override
-	@Transactional(readOnly = true)
-	public ContactResponse getContactById(UUID id) {
+    @Override
+    @Transactional(readOnly = true)
+    public ContactResponse getContactById(UUID id) {
 
-		Contact contact = contactRepository.findById(id)
-				.orElseThrow(() -> new RuntimeException("Contacto no encontrado: " + id));
+        Contact contact = contactRepository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Contacto no encontrado: " + id)
+                );
 
-		return toResponse(contact);
-	}
+        return toResponse(contact);
+    }
+    
+    @Override
+    @Transactional
+    public void delete(UUID id) {
 
-	@Override
-	@Transactional
-	public void delete(UUID id) {
+        /*
+         * ============================================================
+         * 1. BUSCAR EL CONTACTO
+         * ============================================================
+         */
 
-		// 1. Buscar contacto
-		Contact contact = contactRepository.findById(id)
-				.orElseThrow(() -> new RuntimeException("Contacto no encontrado."));
+        Contact contact = this.contactRepository
+                .findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Contacto no encontrado."
+                        )
+                );
 
-		// 2. Recorrer conversaciones y mensajes
-		List<Conversation> conversations = contact.getConversations() == null ? List.of()
-				: List.copyOf(contact.getConversations());
 
-		for (Conversation conversation : conversations) {
+        /*
+         * ============================================================
+         * 2. OBTENER LAS CONVERSACIONES
+         * ============================================================
+         *
+         * Creamos una copia de la colección para evitar problemas
+         * si Hibernate modifica la colección durante la eliminación.
+         */
 
-			if (conversation == null) {
-				continue;
-			}
+        List<Conversation> conversations =
+                contact.getConversations() == null
+                        ? List.of()
+                        : List.copyOf(
+                                contact.getConversations()
+                        );
 
-			List<Message> messages = conversation.getMessages() == null ? List.of()
-					: List.copyOf(conversation.getMessages());
 
-			// 3. Eliminar archivos multimedia
-			for (Message message : messages) {
+        /*
+         * ============================================================
+         * 3. RECORRER LAS CONVERSACIONES
+         * ============================================================
+         */
 
-				if (message == null) {
-					continue;
-				}
+        for (Conversation conversation : conversations) {
 
-				String storagePath = message.getStoragePath();
+            if (conversation == null) {
+                continue;
+            }
 
-				if (storagePath != null && !storagePath.isBlank()) {
-					try {
-						mediaStorageServiceImpl.delete(storagePath);
-					} catch (Exception e) {
-						System.err.println("Error eliminando archivo: " + storagePath);
-						System.err.println(e.getMessage());
-					}
-				}
-			}
-		}
 
-		// 4. Eliminar contacto
-		// Hibernate eliminará conversaciones y mensajes
-		// mediante CascadeType.ALL.
-		contactRepository.delete(contact);
+            /*
+             * ========================================================
+             * 4. OBTENER LOS MENSAJES
+             * ========================================================
+             */
 
-		// 5. Ejecutar operaciones SQL
-		contactRepository.flush();
-	}
+            List<Message> messages =
+                    conversation.getMessages() == null
+                            ? List.of()
+                            : List.copyOf(
+                                    conversation.getMessages()
+                            );
 
-	private ContactResponse toResponse(Contact contact) {
 
-		String registrationStatus = contact.getRegistrationStep() != null
-				&& contact.getRegistrationStep().name().equals("COMPLETED") ? "COMPLETO" : "INCOMPLETO";
+            /*
+             * ========================================================
+             * 5. ELIMINAR ARCHIVOS MULTIMEDIA FÍSICOS
+             * ========================================================
+             *
+             * La base de datos solamente guarda la referencia
+             * (storagePath).
+             *
+             * Por eso debemos eliminar también el archivo físico.
+             */
 
-		return ContactResponse.builder().id(contact.getId()).name(contact.getName()).phone(contact.getPhone())
-				.email(contact.getEmail()).company(contact.getCompany()).registrationStep(contact.getRegistrationStep())
-				.registrationStatus(registrationStatus).firstContact(contact.getFirstContact())
-				.lastInteraction(contact.getLastInteraction()).createdAt(contact.getCreatedAt()).build();
-	}
+            for (Message message : messages) {
+
+                if (message == null) {
+                    continue;
+                }
+
+                String storagePath =
+                        message.getStoragePath();
+
+
+                if (storagePath != null
+                        && !storagePath.isBlank()) {
+
+                    try {
+
+                        this.mediaStorageServiceImpl.delete(
+                                storagePath
+                        );
+
+                    } catch (Exception e) {
+
+                        /*
+                         * Si el archivo físico ya no existe
+                         * o Storage presenta algún problema,
+                         * no detenemos la eliminación de la BD.
+                         */
+
+                        System.err.println(
+                                "No fue posible eliminar el archivo multimedia: "
+                                        + storagePath
+                        );
+
+                        System.err.println(
+                                "Detalle: "
+                                        + e.getMessage()
+                        );
+                    }
+                }
+            }
+
+
+            /*
+             * ========================================================
+             * 6. ELIMINAR MENSAJES DE LA BASE DE DATOS
+             * ========================================================
+             *
+             * Se eliminan primero los mensajes porque dependen
+             * de la conversación.
+             */
+
+            if (!messages.isEmpty()) {
+
+                this.messageRepository.deleteAll(
+                        messages
+                );
+            }
+
+
+            /*
+             * ========================================================
+             * 7. ELIMINAR LA CONVERSACIÓN
+             * ========================================================
+             */
+
+            this.conversationRepository.delete(
+                    conversation
+            );
+        }
+
+
+        /*
+         * ============================================================
+         * 8. ELIMINAR EL CONTACTO
+         * ============================================================
+         *
+         * En este punto:
+         *
+         * Contacto
+         *    └── Conversaciones
+         *          └── Mensajes
+         *
+         * ya fueron procesados.
+         */
+
+        this.contactRepository.delete(
+                contact
+        );
+
+
+        /*
+         * ============================================================
+         * 9. FORZAR LA EJECUCIÓN DE LAS OPERACIONES
+         * ============================================================
+         *
+         * Esto permite detectar inmediatamente cualquier problema
+         * de integridad referencial antes de finalizar la transacción.
+         */
+
+        this.contactRepository.flush();
+    }
+
+
+    private ContactResponse toResponse(Contact contact) {
+
+        String registrationStatus =
+                contact.getRegistrationStep() != null
+                        && contact.getRegistrationStep().name().equals("COMPLETED")
+                        ? "COMPLETO"
+                        : "INCOMPLETO";
+
+        return ContactResponse.builder()
+                .id(contact.getId())
+                .name(contact.getName())
+                .phone(contact.getPhone())
+                .email(contact.getEmail())
+                .company(contact.getCompany())
+                .registrationStep(contact.getRegistrationStep())
+                .registrationStatus(registrationStatus)
+                .firstContact(contact.getFirstContact())
+                .lastInteraction(contact.getLastInteraction())
+                .createdAt(contact.getCreatedAt())
+                .build();
+    }
 }

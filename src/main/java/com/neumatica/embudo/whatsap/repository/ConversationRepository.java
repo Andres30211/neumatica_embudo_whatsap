@@ -133,8 +133,4 @@ public interface ConversationRepository
             LocalDateTime from,
             LocalDateTime to
     );
-    
-    @Modifying
-    @Query("DELETE FROM Conversation c WHERE c.id = :id")
-    void deleteConversationDirectly(@Param("id") UUID id);
 }
