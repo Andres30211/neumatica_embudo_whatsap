@@ -8,7 +8,9 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import com.neumatica.embudo.whatsap.entitys.Contact;
 import com.neumatica.embudo.whatsap.entitys.Conversation;
@@ -131,4 +133,8 @@ public interface ConversationRepository
             LocalDateTime from,
             LocalDateTime to
     );
+    
+    @Modifying
+    @Query("DELETE FROM Conversation c WHERE c.id = :id")
+    void deleteConversationDirectly(@Param("id") UUID id);
 }

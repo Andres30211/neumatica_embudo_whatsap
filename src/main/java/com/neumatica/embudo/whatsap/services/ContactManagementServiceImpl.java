@@ -196,9 +196,7 @@ public class ContactManagementServiceImpl implements ContactManagementService {
              * ========================================================
              */
 
-            this.conversationRepository.delete(
-                    conversation
-            );
+            this.conversationRepository.deleteConversationDirectly(conversation.getId());
         }
 
 
