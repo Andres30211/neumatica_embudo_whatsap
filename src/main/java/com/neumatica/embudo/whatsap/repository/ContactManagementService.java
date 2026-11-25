@@ -1,5 +1,6 @@
 package com.neumatica.embudo.whatsap.repository;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -14,4 +15,6 @@ public interface ContactManagementService {
     Page<ContactResponse> getContacts(Pageable pageable);
 
     ContactResponse getContactById(UUID id);
+    
+    List<ContactResponse> getContactsByIds(List<UUID> ids);
 }

@@ -45,6 +45,16 @@ public class ContactManagementServiceImpl implements ContactManagementService {
                 .findAllByOrderByCreatedAtDesc(pageable)
                 .map(this::toResponse);
     }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public List<ContactResponse> getContactsByIds(List<UUID> ids) {
+
+        return contactRepository.findAllById(ids)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
 
     @Override
     @Transactional(readOnly = true)
