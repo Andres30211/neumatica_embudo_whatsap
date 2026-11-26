@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -177,15 +178,30 @@ public class WhatsappResponseAutimaticsImpl implements WhatsappResponseAutimatic
 				}
 			};
 
+			HttpHeaders fileHeaders = new HttpHeaders();
+			fileHeaders.setContentType(MediaType.parseMediaType(mimeType));
+			fileHeaders.setContentDispositionFormData("file", fileName);
+
+			HttpEntity<ByteArrayResource> filePart = new HttpEntity<>(resource, fileHeaders);
+
 			MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
 
 			body.add("messaging_product", "whatsapp");
-			body.add("file", resource);
+			body.add("file", filePart);
 			body.add("type", mimeType);
+
+			System.out.println("========== SUBIENDO AUDIO A META ==========");
+			System.out.println("Archivo: " + fileName);
+			System.out.println("MIME: " + mimeType);
+			System.out.println("Tamaño: " + bytes.length);
+			System.out.println("===========================================");
 
 			ResponseEntity<String> response = restClient.post().uri(url)
 					.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
 					.contentType(MediaType.MULTIPART_FORM_DATA).body(body).retrieve().toEntity(String.class);
+
+			System.out.println("STATUS META: " + response.getStatusCode());
+			System.out.println("RESPUESTA META: " + response.getBody());
 
 			JsonNode json = objectMapper.readTree(response.getBody());
 			JsonNode idNode = json.get("id");
