@@ -29,235 +29,163 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ConversationController {
 
-    private final ConversationAttentionService conversationAttentionService;
+	private final ConversationAttentionService conversationAttentionService;
 
-    private final ManualMessageService manualMessageService;
+	private final ManualMessageService manualMessageService;
 
-    private final ConversationRepository conversationRepository;
+	private final ConversationRepository conversationRepository;
 
+	/**
+	 * ============================================================ TOMAR
+	 * CONVERSACIÓN ============================================================
+	 */
+	@PostMapping("/{conversationId}/take")
+	public ResponseEntity<Conversation> takeConversation(
 
-    /**
-     * ============================================================
-     * TOMAR CONVERSACIÓN
-     * ============================================================
-     */
-    @PostMapping("/{conversationId}/take")
-    public ResponseEntity<Conversation> takeConversation(
+			@PathVariable UUID conversationId,
 
-            @PathVariable UUID conversationId,
+			@AuthenticationPrincipal Jwt jwt
 
-            @AuthenticationPrincipal Jwt jwt
+	) {
 
-    ) {
+		UUID userId = getUserIdFromJwt(jwt);
 
-        UUID userId =
-                getUserIdFromJwt(jwt);
+		String accessToken = jwt.getTokenValue();
 
-        String accessToken =
-                jwt.getTokenValue();
+		Conversation conversation = conversationAttentionService.takeConversation(conversationId, userId, accessToken);
 
-        Conversation conversation =
-                conversationAttentionService.takeConversation(
-                        conversationId,
-                        userId,
-                        accessToken
-                );
+		return ResponseEntity.ok(conversation);
+	}
 
-        return ResponseEntity.ok(conversation);
-    }
+	/**
+	 * ============================================================ ENVIAR MENSAJE
+	 * MANUAL ============================================================
+	 */
+	@PostMapping("/{conversationId}/messages")
+	public ResponseEntity<Message> sendMessage(
 
+			@PathVariable UUID conversationId,
 
-    /**
-     * ============================================================
-     * ENVIAR MENSAJE MANUAL
-     * ============================================================
-     */
-    @PostMapping("/{conversationId}/messages")
-    public ResponseEntity<Message> sendMessage(
+			@RequestBody SendMessageRequest request,
 
-            @PathVariable UUID conversationId,
+			@AuthenticationPrincipal Jwt jwt
 
-            @RequestBody SendMessageRequest request,
+	) {
 
-            @AuthenticationPrincipal Jwt jwt
+		UUID userId = getUserIdFromJwt(jwt);
 
-    ) {
+		String accessToken = jwt.getTokenValue();
 
-        UUID userId =
-                getUserIdFromJwt(jwt);
+		Message message = manualMessageService.sendMessage(conversationId, userId, request.getMessage(), accessToken);
 
-        String accessToken =
-                jwt.getTokenValue();
+		return ResponseEntity.ok(message);
+	}
 
-        Message message =
-                manualMessageService.sendMessage(
-                        conversationId,
-                        userId,
-                        request.getMessage(),
-                        accessToken
-                );
+	/**
+	 * ============================================================ ENVIAR ARCHIVO /
+	 * MULTIMEDIA ============================================================
+	 */
+	@PostMapping(value = "/{conversationId}/media", consumes = "multipart/form-data")
+	public ResponseEntity<Message> sendMedia(
 
-        return ResponseEntity.ok(message);
-    }
-    
-    /**
-     * ============================================================
-     * ENVIAR ARCHIVO / MULTIMEDIA
-     * ============================================================
-     */
-    @PostMapping(
-            value = "/{conversationId}/media",
-            consumes = "multipart/form-data"
-    )
-    public ResponseEntity<Message> sendMedia(
+			@PathVariable UUID conversationId,
 
-            @PathVariable UUID conversationId,
+			@RequestParam("file") MultipartFile file,
 
-            @RequestParam("file")
-            MultipartFile file,
+			@RequestParam(value = "caption", required = false) String caption,
 
-            @RequestParam(
-                    value = "caption",
-                    required = false
-            )
-            String caption,
+			@AuthenticationPrincipal Jwt jwt
 
-            @AuthenticationPrincipal Jwt jwt
+	) {
 
-    ) {
+		UUID userId = getUserIdFromJwt(jwt);
 
-        UUID userId =
-                getUserIdFromJwt(jwt);
+		String accessToken = jwt.getTokenValue();
 
-        String accessToken =
-                jwt.getTokenValue();
+		Message message = manualMessageService.sendMedia(conversationId, userId, file, caption, accessToken);
 
-        Message message =
-                manualMessageService.sendMedia(
-                        conversationId,
-                        userId,
-                        file,
-                        caption,
-                        accessToken
-                );
+		return ResponseEntity.ok(message);
+	}
 
-        return ResponseEntity.ok(
-                message
-        );
-    }
+	/**
+	 * ============================================================ OBTENER
+	 * CONVERSACIÓN ============================================================
+	 */
+	@GetMapping("/{conversationId}")
+	public ResponseEntity<Conversation> getConversation(
 
+			@PathVariable UUID conversationId
 
-    /**
-     * ============================================================
-     * OBTENER CONVERSACIÓN
-     * ============================================================
-     */
-    @GetMapping("/{conversationId}")
-    public ResponseEntity<Conversation> getConversation(
+	) {
 
-            @PathVariable UUID conversationId
+		Conversation conversation = conversationRepository.findById(conversationId)
+				.orElseThrow(() -> new RuntimeException("Conversación no encontrada."));
 
-    ) {
+		return ResponseEntity.ok(conversation);
+	}
 
-        Conversation conversation =
-                conversationRepository
-                        .findById(conversationId)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Conversación no encontrada."
-                                )
-                        );
+	/**
+	 * ============================================================ CERRAR
+	 * CONVERSACIÓN ============================================================
+	 */
+	@PostMapping("/{conversationId}/close")
+	public ResponseEntity<Conversation> closeConversation(
 
-        return ResponseEntity.ok(conversation);
-    }
+			@PathVariable UUID conversationId
 
+	) {
 
-    /**
-     * ============================================================
-     * CERRAR CONVERSACIÓN
-     * ============================================================
-     */
-    @PostMapping("/{conversationId}/close")
-    public ResponseEntity<Conversation> closeConversation(
+		return ResponseEntity.ok(conversationAttentionService.closeConversation(conversationId));
+	}
 
-            @PathVariable UUID conversationId
+	/**
+	 * ============================================================ DEVOLVER AL BOT
+	 * ============================================================
+	 */
+	@PostMapping("/{conversationId}/return-to-bot")
+	public ResponseEntity<Conversation> returnToBot(
 
-    ) {
+			@PathVariable UUID conversationId
 
-        return ResponseEntity.ok(
-                conversationAttentionService
-                        .closeConversation(
-                                conversationId
-                        )
-        );
-    }
+	) {
 
+		return ResponseEntity.ok(conversationAttentionService.returnToBot(conversationId));
+	}
 
-    /**
-     * ============================================================
-     * DEVOLVER AL BOT
-     * ============================================================
-     */
-    @PostMapping("/{conversationId}/return-to-bot")
-    public ResponseEntity<Conversation> returnToBot(
+	@PatchMapping("/{conversationId}/read")
+	public ResponseEntity<Void> markAsRead(@PathVariable UUID conversationId) {
 
-            @PathVariable UUID conversationId
+		conversationAttentionService.markConversationAsRead(conversationId);
 
-    ) {
+		return ResponseEntity.noContent().build();
+	}
 
-        return ResponseEntity.ok(
-                conversationAttentionService
-                        .returnToBot(
-                                conversationId
-                        )
-        );
-    }
-    
-    @PatchMapping("/{conversationId}/read")
-    public ResponseEntity<Void> markAsRead(@PathVariable UUID conversationId) {
+	/**
+	 * ============================================================ OBTENER UUID DEL
+	 * USUARIO DESDE JWT
+	 * ============================================================
+	 */
+	private UUID getUserIdFromJwt(Jwt jwt) {
 
-        conversationAttentionService.markConversationAsRead(conversationId);
+		if (jwt == null) {
 
-        return ResponseEntity.noContent().build();
-    }
+			throw new RuntimeException("JWT no disponible.");
+		}
 
+		String subject = jwt.getSubject();
 
-    /**
-     * ============================================================
-     * OBTENER UUID DEL USUARIO DESDE JWT
-     * ============================================================
-     */
-    private UUID getUserIdFromJwt(Jwt jwt) {
+		if (subject == null || subject.isBlank()) {
 
-        if (jwt == null) {
+			throw new RuntimeException("El JWT no contiene el subject del usuario.");
+		}
 
-            throw new RuntimeException(
-                    "JWT no disponible."
-            );
-        }
+		try {
 
-        String subject =
-                jwt.getSubject();
+			return UUID.fromString(subject);
 
-        if (
-                subject == null ||
-                subject.isBlank()
-        ) {
+		} catch (IllegalArgumentException e) {
 
-            throw new RuntimeException(
-                    "El JWT no contiene el subject del usuario."
-            );
-        }
-
-        try {
-
-            return UUID.fromString(subject);
-
-        } catch (IllegalArgumentException e) {
-
-            throw new RuntimeException(
-                    "El subject del JWT no contiene un UUID válido."
-            );
-        }
-    }
+			throw new RuntimeException("El subject del JWT no contiene un UUID válido.");
+		}
+	}
 }

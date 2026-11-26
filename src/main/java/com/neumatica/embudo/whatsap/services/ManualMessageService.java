@@ -5,8 +5,10 @@ import java.time.ZoneId;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.neumatica.embudo.whatsap.dto.media.StoredFile;
 import com.neumatica.embudo.whatsap.dto.media.WhatsappSendResult;
@@ -31,525 +33,541 @@ import java.util.Locale;
 @Service
 public class ManualMessageService {
 
-    private static final ZoneId ZONE_ID = ZoneId.of("America/Bogota");
+	private static final ZoneId ZONE_ID = ZoneId.of("America/Bogota");
 
-    @Autowired
-    private ConversationRepository conversationRepository;
+	@Autowired
+	private ConversationRepository conversationRepository;
 
-    @Autowired
-    private MessageRepository messageRepository;
+	@Autowired
+	private MessageRepository messageRepository;
 
-    @Autowired
-    private WhatsappResponseAutimatics whatsappResponseAutimatics;
+	@Autowired
+	private WhatsappResponseAutimatics whatsappResponseAutimatics;
 
-    @Autowired
-    private UserClientService userClientService;
+	@Autowired
+	private UserClientService userClientService;
 
-    @Autowired
-    private NotificationService notificationService;
+	@Autowired
+	private NotificationService notificationService;
 
-    @Autowired
-    private FileStorageService fileStorageService;
-    
-    @Autowired
-    private AudioConversionService audioConversionService;
+	@Autowired
+	private FileStorageService fileStorageService;
 
-    public ManualMessageService() {}
+	@Autowired
+	private AudioConversionService audioConversionService;
 
-    // ============================================================
-    // ENVIAR MENSAJE DE TEXTO
-    // ============================================================
-
-    @Transactional
-    public Message sendMessage(
-            UUID conversationId,
-            UUID userId,
-            String text,
-            String accessToken
-    ) {
-
-        validateBasicParameters(
-                conversationId,
-                userId,
-                accessToken
-        );
-
-        if (text == null || text.isBlank()) {
-
-            throw new IllegalArgumentException(
-                    "El mensaje no puede estar vacío."
-            );
-        }
-
-        validateUser(
-                userId,
-                accessToken
-        );
-
-        Conversation conversation =
-                getConversation(
-                        conversationId
-                );
-
-        validateConversationForManualMessage(
-                conversation,
-                userId
-        );
-
-        Contact contact =
-                getContact(conversation);
-
-        validatePhone(contact);
-
-        WhatsappSendResult sendResult =
-                whatsappResponseAutimatics.sendText(
-                        contact.getPhone(),
-                        text
-                );
-
-        LocalDateTime now =
-                LocalDateTime.now(
-                        ZONE_ID
-                );
-
-        Message message =
-                Message.builder()
-
-                        .whatsappMessageId(
-                                sendResult.getMessageId()
-                        )
-
-                        .conversation(
-                                conversation
-                        )
-
-                        .direction(
-                                Direction.OUTGOING
-                        )
-
-                        .senderUserId(
-                                userId
-                        )
-
-                        .type(
-                                MessageType.TEXT
-                        )
-
-                        .body(
-                                text
-                        )
-
-                        .createdAt(
-                                now
-                        )
-
-                        .whatsappTimestamp(
-                                now.atZone(
-                                        ZONE_ID
-                                ).toEpochSecond()
-                        )
-
-                        .build();
-
-        conversation.addMessage(
-                message
-        );
-
-        conversation.setLastMessageAt(
-                now
-        );
-
-        conversationRepository.save(
-                conversation
-        );
-
-        notificationService
-                .sendConversationMessageAfterCommit(
-                        conversation.getId(),
-                        message
-                );
-
-        notificationService
-                .sendConversationSummaryAfterCommit(
-                        conversation,
-                        message
-                );
-
-        return message;
-    }
-
-    // ============================================================
-    // ENVIAR ARCHIVO / MULTIMEDIA
-    // ============================================================
-
-    
-	@Transactional
-	public Message sendMedia(
-	        UUID conversationId,
-	        UUID userId,
-	        MultipartFile file,
-	        String caption,
-	        String accessToken
-	) {
-	
-	    validateBasicParameters(conversationId, userId, accessToken);
-	
-	    if (file == null || file.isEmpty()) {
-	        throw new IllegalArgumentException(
-	                "El archivo es obligatorio."
-	        );
-	    }
-	
-	    validateUser(userId, accessToken);
-	
-	    Conversation conversation = getConversation(conversationId);
-	
-	    validateConversationForManualMessage(conversation, userId);
-	
-	    Contact contact = getContact(conversation);
-	
-	    validatePhone(contact);
-	
-	    Path inputAudio = null;
-	    Path convertedAudio = null;
-	    StoredFile storedFile = null;
-	
-	    try {
-	        MultipartFile fileToProcess = file;
-	        
-	        System.out.println("========== ARCHIVO RECIBIDO ==========");
-	        System.out.println("Nombre: " + file.getOriginalFilename());
-	        System.out.println("Content-Type: " + file.getContentType());
-	        System.out.println("Tamaño: " + file.getSize());
-	        System.out.println("Vacío: " + file.isEmpty());
-	        System.out.println("======================================");
-	
-	        String contentType = file.getContentType() == null
-	                ? ""
-	                : file.getContentType().toLowerCase(Locale.ROOT);
-	
-	        String originalName = file.getOriginalFilename() == null
-	                ? ""
-	                : file.getOriginalFilename().toLowerCase(Locale.ROOT);
-	
-	        boolean isWebmAudio =
-	                contentType.contains("webm")
-	                || originalName.endsWith(".webm");
-	
-	        // 1. Convertir WebM a OGG/Opus cuando sea necesario.
-	        if (isWebmAudio) {
-	            inputAudio = Files.createTempFile(
-	                    "incoming-audio-", ".webm"
-	            );
-	
-	            file.transferTo(inputAudio);
-	
-	            convertedAudio =
-	                    audioConversionService.convertWebmToOggOpus(
-	                            inputAudio
-	                    );
-	
-	            fileToProcess = new ConvertedAudioMultipartFile(
-	                    convertedAudio,
-	                    "audio.ogg"
-	            );
-	        }
-	
-	        // 2. Guardar el archivo que realmente vamos a enviar.
-	        storedFile = fileStorageService.store(
-	                fileToProcess,
-	                conversationId
-	        );
-	
-	        String mimeType = storedFile.getMimeType();
-	
-	        MessageType messageType;
-	
-	        if (mimeType != null
-	                && mimeType.toLowerCase(Locale.ROOT)
-	                        .startsWith("image/")) {
-	
-	            messageType = MessageType.IMAGE;
-	
-	        } else if (mimeType != null
-	                && mimeType.toLowerCase(Locale.ROOT)
-	                        .startsWith("audio/")) {
-	
-	            messageType = MessageType.AUDIO;
-	
-	        } else {
-	            messageType = MessageType.DOCUMENT;
-	        }
-	
-	        // 3. Subir el archivo a WhatsApp.
-	        String mediaId;
-	
-	        if (messageType == MessageType.AUDIO) {
-	            Path audioToUpload = convertedAudio;
-	
-	            if (audioToUpload != null) {
-	                mediaId = whatsappResponseAutimatics.uploadAudio(
-	                        audioToUpload,
-	                        "audio.ogg",
-	                        "audio/ogg"
-	                );
-	            } else {
-	                mediaId = whatsappResponseAutimatics.uploadMedia(
-	                        fileToProcess
-	                );
-	            }
-	        } else {
-	            mediaId = whatsappResponseAutimatics.uploadMedia(
-	                    fileToProcess
-	            );
-	        }
-	
-	        // 4. Enviar según el tipo de archivo.
-	        WhatsappSendResult sendResult;
-	
-	        if (messageType == MessageType.IMAGE) {
-	
-	            sendResult = whatsappResponseAutimatics.sendImage(
-	                    contact.getPhone(),
-	                    mediaId,
-	                    caption
-	            );
-	
-	        } else if (messageType == MessageType.AUDIO) {
-	
-	            sendResult = whatsappResponseAutimatics.sendAudio(
-	                    contact.getPhone(),
-	                    mediaId
-	            );
-	
-	        } else {
-	
-	            sendResult = whatsappResponseAutimatics.sendDocument(
-	                    contact.getPhone(),
-	                    mediaId,
-	                    caption,
-	                    storedFile.getOriginalFileName()
-	            );
-	        }
-	
-	        // 5. Crear el registro del mensaje.
-	        LocalDateTime now = LocalDateTime.now(ZONE_ID);
-	
-	        Message message = Message.builder()
-	                .whatsappMessageId(sendResult.getMessageId())
-	                .conversation(conversation)
-	                .direction(Direction.OUTGOING)
-	                .senderUserId(userId)
-	                .type(messageType)
-	                .body(null)
-	                .mediaId(mediaId)
-	                .storagePath(storedFile.getStoragePath())
-	                .mimeType(storedFile.getMimeType())
-	                .sha256(storedFile.getSha256())
-	                .caption(caption)
-	                .fileName(storedFile.getOriginalFileName())
-	                .createdAt(now)
-	                .whatsappTimestamp(
-	                        now.atZone(ZONE_ID).toEpochSecond()
-	                )
-	                .build();
-	
-	        // 6. Actualizar la conversación.
-	        conversation.addMessage(message);
-	        conversation.setLastMessageAt(now);
-	
-	        conversationRepository.save(conversation);
-	
-	        // 7. Notificar por WebSocket.
-	        notificationService.sendConversationMessageAfterCommit(
-	                conversation.getId(),
-	                message
-	        );
-	
-	        notificationService.sendConversationSummaryAfterCommit(
-	                conversation,
-	                message
-	        );
-	
-	        return message;
-	
-	    } catch (IOException e) {
-	
-	        deleteStoredFile(storedFile);
-	
-	        throw new RuntimeException(
-	                "Error procesando o convirtiendo el archivo multimedia.",
-	                e
-	        );
-	
-	    } catch (RuntimeException e) {
-	
-	        deleteStoredFile(storedFile);
-	
-	        throw e;
-	
-	    } finally {
-	
-	        try {
-	            if (inputAudio != null) {
-	                Files.deleteIfExists(inputAudio);
-	            }
-	
-	            if (convertedAudio != null) {
-	                Files.deleteIfExists(convertedAudio);
-	            }
-	        } catch (IOException e) {
-	            System.err.println(
-	                    "No se pudieron eliminar los archivos temporales: "
-	                            + e.getMessage()
-	            );
-	        }
-	    }
+	public ManualMessageService() {
 	}
-	
+
+	// ============================================================
+	// ENVIAR MENSAJE DE TEXTO
+	// ============================================================
+
+	@Transactional
+	public Message sendMessage(UUID conversationId, UUID userId, String text, String accessToken) {
+
+		validateBasicParameters(conversationId, userId, accessToken);
+
+		if (text == null || text.isBlank()) {
+
+			throw new IllegalArgumentException("El mensaje no puede estar vacío.");
+		}
+
+		validateUser(userId, accessToken);
+
+		Conversation conversation = getConversation(conversationId);
+
+		validateConversationForManualMessage(conversation, userId);
+
+		Contact contact = getContact(conversation);
+
+		validatePhone(contact);
+
+		WhatsappSendResult sendResult = whatsappResponseAutimatics.sendText(contact.getPhone(), text);
+
+		LocalDateTime now = LocalDateTime.now(ZONE_ID);
+
+		Message message = Message.builder()
+
+				.whatsappMessageId(sendResult.getMessageId())
+
+				.conversation(conversation)
+
+				.direction(Direction.OUTGOING)
+
+				.senderUserId(userId)
+
+				.type(MessageType.TEXT)
+
+				.body(text)
+
+				.createdAt(now)
+
+				.whatsappTimestamp(now.atZone(ZONE_ID).toEpochSecond())
+
+				.build();
+
+		conversation.addMessage(message);
+
+		conversation.setLastMessageAt(now);
+
+		conversationRepository.save(conversation);
+
+		notificationService.sendConversationMessageAfterCommit(conversation.getId(), message);
+
+		notificationService.sendConversationSummaryAfterCommit(conversation, message);
+
+		return message;
+	}
+
+	// ============================================================
+	// ENVIAR ARCHIVO / MULTIMEDIA
+	// ============================================================
+
+	/*
+	 * @Transactional public Message sendMedia(UUID conversationId, UUID userId,
+	 * MultipartFile file, String caption, String accessToken) {
+	 * 
+	 * validateBasicParameters(conversationId, userId, accessToken);
+	 * 
+	 * if (file == null || file.isEmpty()) { throw new
+	 * IllegalArgumentException("El archivo es obligatorio."); }
+	 * 
+	 * validateUser(userId, accessToken);
+	 * 
+	 * Conversation conversation = getConversation(conversationId);
+	 * 
+	 * validateConversationForManualMessage(conversation, userId);
+	 * 
+	 * Contact contact = getContact(conversation);
+	 * 
+	 * validatePhone(contact);
+	 * 
+	 * Path inputAudio = null; Path convertedAudio = null; StoredFile storedFile =
+	 * null;
+	 * 
+	 * try { MultipartFile fileToProcess = file;
+	 * 
+	 * System.out.println("========== ARCHIVO RECIBIDO ==========");
+	 * System.out.println("Nombre: " + file.getOriginalFilename());
+	 * System.out.println("Content-Type: " + file.getContentType());
+	 * System.out.println("Tamaño: " + file.getSize()); System.out.println("Vacío: "
+	 * + file.isEmpty());
+	 * System.out.println("======================================");
+	 * 
+	 * String contentType = file.getContentType() == null ? "" :
+	 * file.getContentType().toLowerCase(Locale.ROOT);
+	 * 
+	 * String originalName = file.getOriginalFilename() == null ? "" :
+	 * file.getOriginalFilename().toLowerCase(Locale.ROOT);
+	 * 
+	 * boolean isWebmAudio = contentType.contains("webm") ||
+	 * originalName.endsWith(".webm");
+	 * 
+	 * // 1. Convertir WebM a OGG/Opus cuando sea necesario. if (isWebmAudio) {
+	 * inputAudio = Files.createTempFile("incoming-audio-", ".webm");
+	 * 
+	 * file.transferTo(inputAudio);
+	 * 
+	 * convertedAudio = audioConversionService.convertWebmToOggOpus(inputAudio);
+	 * 
+	 * fileToProcess = new ConvertedAudioMultipartFile(convertedAudio, "audio.ogg");
+	 * }
+	 * 
+	 * // 2. Guardar el archivo que realmente vamos a enviar. storedFile =
+	 * fileStorageService.store(fileToProcess, conversationId);
+	 * 
+	 * String mimeType = storedFile.getMimeType();
+	 * 
+	 * MessageType messageType;
+	 * 
+	 * if (mimeType != null &&
+	 * mimeType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+	 * 
+	 * messageType = MessageType.IMAGE;
+	 * 
+	 * } else if (mimeType != null &&
+	 * mimeType.toLowerCase(Locale.ROOT).startsWith("audio/")) {
+	 * 
+	 * messageType = MessageType.AUDIO;
+	 * 
+	 * } else { messageType = MessageType.DOCUMENT; }
+	 * 
+	 * // 3. Subir el archivo a WhatsApp. String mediaId;
+	 * 
+	 * if (messageType == MessageType.AUDIO) { Path audioToUpload = convertedAudio;
+	 * 
+	 * if (audioToUpload != null) { mediaId =
+	 * whatsappResponseAutimatics.uploadAudio(audioToUpload, "audio.ogg",
+	 * "audio/ogg"); } else { mediaId =
+	 * whatsappResponseAutimatics.uploadMedia(fileToProcess); } } else { mediaId =
+	 * whatsappResponseAutimatics.uploadMedia(fileToProcess); }
+	 * 
+	 * // 4. Enviar según el tipo de archivo. WhatsappSendResult sendResult;
+	 * 
+	 * if (messageType == MessageType.IMAGE) {
+	 * 
+	 * sendResult = whatsappResponseAutimatics.sendImage(contact.getPhone(),
+	 * mediaId, caption);
+	 * 
+	 * } else if (messageType == MessageType.AUDIO) {
+	 * 
+	 * sendResult = whatsappResponseAutimatics.sendAudio(contact.getPhone(),
+	 * mediaId);
+	 * 
+	 * } else {
+	 * 
+	 * sendResult = whatsappResponseAutimatics.sendDocument(contact.getPhone(),
+	 * mediaId, caption, storedFile.getOriginalFileName()); }
+	 * 
+	 * // 5. Crear el registro del mensaje. LocalDateTime now =
+	 * LocalDateTime.now(ZONE_ID);
+	 * 
+	 * Message message =
+	 * Message.builder().whatsappMessageId(sendResult.getMessageId()).conversation(
+	 * conversation)
+	 * .direction(Direction.OUTGOING).senderUserId(userId).type(messageType).body(
+	 * null).mediaId(mediaId)
+	 * .storagePath(storedFile.getStoragePath()).mimeType(storedFile.getMimeType())
+	 * .sha256(storedFile.getSha256()).caption(caption).fileName(storedFile.
+	 * getOriginalFileName())
+	 * .createdAt(now).whatsappTimestamp(now.atZone(ZONE_ID).toEpochSecond()).build(
+	 * );
+	 * 
+	 * // 6. Actualizar la conversación. conversation.addMessage(message);
+	 * conversation.setLastMessageAt(now);
+	 * 
+	 * conversationRepository.save(conversation);
+	 * 
+	 * // 7. Notificar por WebSocket.
+	 * notificationService.sendConversationMessageAfterCommit(conversation.getId(),
+	 * message);
+	 * 
+	 * notificationService.sendConversationSummaryAfterCommit(conversation,
+	 * message);
+	 * 
+	 * return message;
+	 * 
+	 * } catch (IOException e) {
+	 * 
+	 * deleteStoredFile(storedFile);
+	 * 
+	 * throw new
+	 * RuntimeException("Error procesando o convirtiendo el archivo multimedia.",
+	 * e);
+	 * 
+	 * } catch (RuntimeException e) {
+	 * 
+	 * deleteStoredFile(storedFile);
+	 * 
+	 * throw e;
+	 * 
+	 * } finally {
+	 * 
+	 * try { if (inputAudio != null) { Files.deleteIfExists(inputAudio); }
+	 * 
+	 * if (convertedAudio != null) { Files.deleteIfExists(convertedAudio); } } catch
+	 * (IOException e) {
+	 * System.err.println("No se pudieron eliminar los archivos temporales: " +
+	 * e.getMessage()); } } }
+	 */
+
+	@Transactional
+	public Message sendMedia(UUID conversationId, UUID userId, MultipartFile file, String caption, String accessToken) {
+
+		Path inputAudio = null;
+		Path convertedAudio = null;
+		StoredFile storedFile = null;
+
+		String stage = "INICIO";
+
+		try {
+
+			// 1. Validaciones iniciales
+
+			stage = "VALIDACION_PARAMETROS";
+
+			validateBasicParameters(conversationId, userId, accessToken);
+
+			if (file == null) {
+				throw new IllegalArgumentException("Spring no recibió ningún archivo. El MultipartFile es null.");
+			}
+
+			if (file.isEmpty()) {
+				throw new IllegalArgumentException("Spring recibió un archivo vacío.");
+			}
+
+			validateUser(userId, accessToken);
+
+			Conversation conversation = getConversation(conversationId);
+
+			validateConversationForManualMessage(conversation, userId);
+
+			Contact contact = getContact(conversation);
+
+			validatePhone(contact);
+
+			// 2. Registrar información del archivo
+
+			stage = "RECEPCION_ARCHIVO";
+
+			System.out.println("\n========== ARCHIVO RECIBIDO ==========");
+			System.out.println("Nombre: " + file.getOriginalFilename());
+			System.out.println("Content-Type: " + file.getContentType());
+			System.out.println("Tamaño: " + file.getSize());
+			System.out.println("Vacío: " + file.isEmpty());
+			System.out.println("Bytes disponibles: " + file.getBytes().length);
+			System.out.println("======================================\n");
+
+			MultipartFile fileToProcess = file;
+
+			String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+
+			String originalName = file.getOriginalFilename() == null ? ""
+					: file.getOriginalFilename().toLowerCase(Locale.ROOT);
+
+			boolean isWebmAudio = contentType.contains("webm") || originalName.endsWith(".webm");
+
+			// 3. Conversión de audio
+
+			if (isWebmAudio) {
+
+				stage = "CONVERSION_AUDIO";
+
+				inputAudio = Files.createTempFile("incoming-audio-", ".webm");
+
+				file.transferTo(inputAudio);
+
+				convertedAudio = audioConversionService.convertWebmToOggOpus(inputAudio);
+
+				fileToProcess = new ConvertedAudioMultipartFile(convertedAudio, "audio.ogg");
+			}
+
+			// 4. Almacenamiento
+
+			stage = "ALMACENAMIENTO";
+
+			storedFile = fileStorageService.store(fileToProcess, conversationId);
+
+			String mimeType = storedFile.getMimeType();
+
+			System.out.println("========== ARCHIVO ALMACENADO ==========");
+			System.out.println("Nombre: " + storedFile.getOriginalFileName());
+			System.out.println("MIME: " + mimeType);
+			System.out.println("========================================");
+
+			// 5. Clasificación
+
+			stage = "CLASIFICACION_ARCHIVO";
+
+			MessageType messageType;
+
+			String normalizedMime = mimeType == null ? "" : mimeType.toLowerCase(Locale.ROOT);
+
+			if (normalizedMime.startsWith("image/")) {
+
+				messageType = MessageType.IMAGE;
+
+			} else if (normalizedMime.startsWith("audio/")) {
+
+				messageType = MessageType.AUDIO;
+
+			} else {
+
+				messageType = MessageType.DOCUMENT;
+			}
+
+			System.out.println("TIPO DE MENSAJE: " + messageType);
+
+			// 6. Subida a WhatsApp
+
+			stage = "SUBIDA_WHATSAPP";
+
+			String mediaId;
+
+			if (messageType == MessageType.AUDIO) {
+
+				if (convertedAudio != null) {
+
+					mediaId = whatsappResponseAutimatics.uploadAudio(convertedAudio, "audio.ogg", "audio/ogg");
+
+				} else {
+
+					mediaId = whatsappResponseAutimatics.uploadMedia(fileToProcess);
+				}
+
+			} else {
+
+				mediaId = whatsappResponseAutimatics.uploadMedia(fileToProcess);
+			}
+
+			if (mediaId == null || mediaId.isBlank()) {
+				throw new IllegalStateException("WhatsApp no devolvió un identificador multimedia.");
+			}
+
+			// 7. Enviar mensaje
+
+			stage = "ENVIO_WHATSAPP";
+
+			WhatsappSendResult sendResult;
+
+			if (messageType == MessageType.IMAGE) {
+
+				sendResult = whatsappResponseAutimatics.sendImage(contact.getPhone(), mediaId, caption);
+
+			} else if (messageType == MessageType.AUDIO) {
+
+				sendResult = whatsappResponseAutimatics.sendAudio(contact.getPhone(), mediaId);
+
+			} else {
+
+				sendResult = whatsappResponseAutimatics.sendDocument(contact.getPhone(), mediaId, caption,
+						storedFile.getOriginalFileName());
+			}
+
+			// 8. Registrar mensaje
+
+			stage = "REGISTRO_MENSAJE";
+
+			LocalDateTime now = LocalDateTime.now(ZONE_ID);
+
+			Message message = Message.builder().whatsappMessageId(sendResult.getMessageId()).conversation(conversation)
+					.direction(Direction.OUTGOING).senderUserId(userId).type(messageType).body(null).mediaId(mediaId)
+					.storagePath(storedFile.getStoragePath()).mimeType(storedFile.getMimeType())
+					.sha256(storedFile.getSha256()).caption(caption).fileName(storedFile.getOriginalFileName())
+					.createdAt(now).whatsappTimestamp(now.atZone(ZONE_ID).toEpochSecond()).build();
+
+			conversation.addMessage(message);
+			conversation.setLastMessageAt(now);
+
+			conversationRepository.save(conversation);
+
+			// 9. Notificaciones
+
+			stage = "NOTIFICACIONES";
+
+			notificationService.sendConversationMessageAfterCommit(conversation.getId(), message);
+
+			notificationService.sendConversationSummaryAfterCommit(conversation, message);
+
+			return message;
+
+		} catch (Exception e) {
+
+			// Limpiar archivo almacenado si ocurrió un error
+
+			deleteStoredFile(storedFile);
+
+			System.err.println("\n========== ERROR EN SEND MEDIA ==========");
+			System.err.println("ETAPA: " + stage);
+			System.err.println("TIPO: " + e.getClass().getName());
+			System.err.println("MENSAJE: " + e.getMessage());
+			System.err.println("CAUSA: " + (e.getCause() != null ? e.getCause().getMessage() : "Sin causa adicional"));
+			e.printStackTrace();
+			System.err.println("==========================================\n");
+
+			// Devolver un mensaje identificable a Angular
+
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Error en etapa [" + stage + "]: "
+					+ (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()), e);
+
+		} finally {
+
+			try {
+
+				if (inputAudio != null) {
+					Files.deleteIfExists(inputAudio);
+				}
+
+				if (convertedAudio != null) {
+					Files.deleteIfExists(convertedAudio);
+				}
+
+			} catch (IOException e) {
+
+				System.err.println("No se pudieron eliminar los archivos temporales: " + e.getMessage());
+			}
+		}
+	}
 
 	private void deleteStoredFile(StoredFile storedFile) {
-	    if (storedFile != null
-	            && storedFile.getStoragePath() != null) {
-	        try {
-	            fileStorageService.delete(
-	                    storedFile.getStoragePath()
-	            );
-	        } catch (RuntimeException e) {
-	            System.err.println(
-	                    "No se pudo eliminar el archivo almacenado: "
-	                            + e.getMessage()
-	            );
-	        }
-	    }
+		if (storedFile != null && storedFile.getStoragePath() != null) {
+			try {
+				fileStorageService.delete(storedFile.getStoragePath());
+			} catch (RuntimeException e) {
+				System.err.println("No se pudo eliminar el archivo almacenado: " + e.getMessage());
+			}
+		}
 	}
 
+	// ============================================================
+	// VALIDACIONES
+	// ============================================================
 
+	private void validateBasicParameters(UUID conversationId, UUID userId, String accessToken) {
 
-    // ============================================================
-    // VALIDACIONES
-    // ============================================================
+		if (conversationId == null) {
 
-    private void validateBasicParameters(
-            UUID conversationId,
-            UUID userId,
-            String accessToken
-    ) {
+			throw new IllegalArgumentException("El conversationId es obligatorio.");
+		}
 
-        if (conversationId == null) {
+		if (userId == null) {
 
-            throw new IllegalArgumentException(
-                    "El conversationId es obligatorio."
-            );
-        }
+			throw new IllegalArgumentException("El userId es obligatorio.");
+		}
 
-        if (userId == null) {
+		if (accessToken == null || accessToken.isBlank()) {
 
-            throw new IllegalArgumentException(
-                    "El userId es obligatorio."
-            );
-        }
+			throw new IllegalArgumentException("El accessToken es obligatorio.");
+		}
+	}
 
-        if (
-                accessToken == null
-                        || accessToken.isBlank()
-        ) {
+	private void validateUser(UUID userId, String accessToken) {
 
-            throw new IllegalArgumentException(
-                    "El accessToken es obligatorio."
-            );
-        }
-    }
+		var user = userClientService.findById(userId, accessToken);
 
-    private void validateUser(
-            UUID userId,
-            String accessToken
-    ) {
+		if (user == null) {
 
-        var user =
-                userClientService.findById(
-                        userId,
-                        accessToken
-                );
+			throw new RuntimeException("Usuario no encontrado.");
+		}
+	}
 
-        if (user == null) {
+	private Conversation getConversation(UUID conversationId) {
 
-            throw new RuntimeException(
-                    "Usuario no encontrado."
-            );
-        }
-    }
+		return conversationRepository.findById(conversationId)
+				.orElseThrow(() -> new RuntimeException("Conversación no encontrada."));
+	}
 
-    private Conversation getConversation(
-            UUID conversationId
-    ) {
+	private void validateConversationForManualMessage(Conversation conversation, UUID userId) {
 
-        return conversationRepository
-                .findById(conversationId)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Conversación no encontrada."
-                        )
-                );
-    }
+		if (conversation.getStatus() != ConversationStatus.HUMAN) {
 
-    private void validateConversationForManualMessage(
-            Conversation conversation,
-            UUID userId
-    ) {
+			throw new RuntimeException("La conversación no está en atención humana.");
+		}
 
-        if (
-                conversation.getStatus()
-                        != ConversationStatus.HUMAN
-        ) {
+		if (!userId.equals(conversation.getAssignedUserId())) {
 
-            throw new RuntimeException(
-                    "La conversación no está en atención humana."
-            );
-        }
+			throw new RuntimeException("La conversación no está asignada a este vendedor.");
+		}
+	}
 
-        if (
-                !userId.equals(
-                        conversation
-                                .getAssignedUserId()
-                )
-        ) {
+	private Contact getContact(Conversation conversation) {
 
-            throw new RuntimeException(
-                    "La conversación no está asignada a este vendedor."
-            );
-        }
-    }
+		Contact contact = conversation.getContact();
 
-    private Contact getContact(
-            Conversation conversation
-    ) {
+		if (contact == null) {
 
-        Contact contact =
-                conversation.getContact();
+			throw new RuntimeException("La conversación no tiene contacto.");
+		}
 
-        if (contact == null) {
+		return contact;
+	}
 
-            throw new RuntimeException(
-                    "La conversación no tiene contacto."
-            );
-        }
+	private void validatePhone(Contact contact) {
 
-        return contact;
-    }
+		if (contact.getPhone() == null || contact.getPhone().isBlank()) {
 
-    private void validatePhone(
-            Contact contact
-    ) {
-
-        if (
-                contact.getPhone() == null
-                        || contact.getPhone().isBlank()
-        ) {
-
-            throw new RuntimeException(
-                    "El contacto no tiene número de WhatsApp."
-            );
-        }
-    }
+			throw new RuntimeException("El contacto no tiene número de WhatsApp.");
+		}
+	}
 }
