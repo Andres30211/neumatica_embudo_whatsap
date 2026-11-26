@@ -389,7 +389,7 @@ public class ManualMessageService {
 
 				if (convertedAudio != null) {
 
-					mediaId = whatsappResponseAutimatics.uploadAudio(convertedAudio, "audio.ogg", "audio/ogg");
+					mediaId = whatsappResponseAutimatics.uploadAudio(convertedAudio, "audio.ogg", "audio/ogg; codecs=opus");
 
 				} else {
 

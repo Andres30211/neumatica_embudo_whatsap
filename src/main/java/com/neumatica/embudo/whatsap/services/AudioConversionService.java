@@ -15,7 +15,15 @@ public class AudioConversionService {
 
 		try {
 			Process process = new ProcessBuilder("ffmpeg", "-nostdin", "-y", "-i", input.toAbsolutePath().toString(),
-					"-map", "0:a:0", "-vn", "-c:a", "libopus", "-ac", "1", "-b:a", "32k", "-f", "ogg",
+					"-map", "0:a:0",
+					"-vn",
+					"-ac", "1",
+					"-ar", "48000",
+					"-c:a", "libopus",
+					"-application", "voip",
+					"-frame_duration", "20",
+					"-b:a", "32k",
+					"-f", "ogg",
 					output.toAbsolutePath().toString()).redirectErrorStream(true)
 					.redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
 
