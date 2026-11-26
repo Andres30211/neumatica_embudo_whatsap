@@ -216,6 +216,13 @@ public class ManualMessageService {
 	
 	    try {
 	        MultipartFile fileToProcess = file;
+	        
+	        System.out.println("========== ARCHIVO RECIBIDO ==========");
+	        System.out.println("Nombre: " + file.getOriginalFilename());
+	        System.out.println("Content-Type: " + file.getContentType());
+	        System.out.println("Tamaño: " + file.getSize());
+	        System.out.println("Vacío: " + file.isEmpty());
+	        System.out.println("======================================");
 	
 	        String contentType = file.getContentType() == null
 	                ? ""
