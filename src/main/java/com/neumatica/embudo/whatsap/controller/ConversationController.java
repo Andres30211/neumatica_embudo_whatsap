@@ -1,5 +1,6 @@
 package com.neumatica.embudo.whatsap.controller;
 
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ import com.neumatica.embudo.whatsap.repository.ConversationRepository;
 import com.neumatica.embudo.whatsap.services.ConversationAttentionService;
 import com.neumatica.embudo.whatsap.services.ManualMessageService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 
 @RestController
@@ -85,21 +87,77 @@ public class ConversationController {
 	 * ============================================================ ENVIAR ARCHIVO /
 	 * MULTIMEDIA ============================================================
 	 */
-	@PostMapping(value = "/{conversationId}/media", consumes = "multipart/form-data")
-	public ResponseEntity<Message> sendMedia(
+	/*
+	 * @PostMapping(value = "/{conversationId}/media", consumes =
+	 * "multipart/form-data") public ResponseEntity<Message> sendMedia(
+	 * 
+	 * @PathVariable UUID conversationId,
+	 * 
+	 * @RequestParam("file") MultipartFile file,
+	 * 
+	 * @RequestParam(value = "caption", required = false) String caption,
+	 * 
+	 * @AuthenticationPrincipal Jwt jwt
+	 * 
+	 * ) {
+	 * 
+	 * UUID userId = getUserIdFromJwt(jwt);
+	 * 
+	 * String accessToken = jwt.getTokenValue();
+	 * 
+	 * Message message = manualMessageService.sendMedia(conversationId, userId,
+	 * file, caption, accessToken);
+	 * 
+	 * return ResponseEntity.ok(message); }
+	 */
+
+	@PostMapping(value = "/{conversationId}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<?> sendMedia(
 
 			@PathVariable UUID conversationId,
 
-			@RequestParam("file") MultipartFile file,
+			@RequestParam(value = "file", required = false) MultipartFile file,
 
 			@RequestParam(value = "caption", required = false) String caption,
 
-			@AuthenticationPrincipal Jwt jwt
+			@AuthenticationPrincipal Jwt jwt,
 
-	) {
+			HttpServletRequest request) {
+
+		System.out.println("\n========== DIAGNOSTICO HTTP MULTIMEDIA ==========");
+
+		System.out.println("Content-Type: " + request.getContentType());
+		System.out.println("Content-Length: " + request.getContentLengthLong());
+		System.out.println("Método: " + request.getMethod());
+		System.out.println("URI: " + request.getRequestURI());
+
+		System.out.println("Archivo null: " + (file == null));
+
+		if (file != null) {
+			System.out.println("Nombre: " + file.getOriginalFilename());
+			System.out.println("MIME: " + file.getContentType());
+			System.out.println("Tamaño: " + file.getSize());
+			System.out.println("Vacío: " + file.isEmpty());
+		}
+
+		System.out.println("=================================================\n");
+
+		// Comprobar si Spring encontró el archivo
+
+		if (file == null) {
+
+			return ResponseEntity.badRequest().body(Map.of("success", false, "code", "FILE_PART_MISSING", "message",
+					"Spring recibió la petición, pero no encontró la parte multipart llamada 'file'.", "contentType",
+					String.valueOf(request.getContentType()), "contentLength", request.getContentLengthLong()));
+		}
+
+		if (file.isEmpty()) {
+
+			return ResponseEntity.badRequest().body(Map.of("success", false, "code", "EMPTY_FILE", "message",
+					"Spring encontró la parte 'file', pero el archivo está vacío."));
+		}
 
 		UUID userId = getUserIdFromJwt(jwt);
-
 		String accessToken = jwt.getTokenValue();
 
 		Message message = manualMessageService.sendMedia(conversationId, userId, file, caption, accessToken);
